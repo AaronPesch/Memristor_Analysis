@@ -1,13 +1,18 @@
+import io
+import shutil
+from pathlib import Path
+
 import PySide6.QtWidgets as qt
 from PySide6.QtCore import QThread, Qt, QUrl
 from PySide6.QtGui import QDesktopServices
+from reportlab.lib.utils import ImageReader
+from reportlab.pdfgen import canvas as rl_canvas
+
+from ..converter import BatchConverter, path_to_glob
+from ..core import MenuAction, Mode
+from .import_worker import ImportWorker
 from .menu_bar import MenuBar
 from .navigation_bar import NavigationBar
-from ..core import MenuAction, Mode
-from ..converter import BatchConverter, path_to_glob
-from .import_worker import ImportWorker
-import shutil
-from pathlib import Path
 
 
 class MainWindow(qt.QMainWindow):
@@ -42,6 +47,9 @@ class MainWindow(qt.QMainWindow):
 
         menu_actions[MenuAction.EXPORT_ALL].triggered.connect(
             lambda checked=False: self.export_all("png")
+        )
+        menu_actions[MenuAction.EXPORT_ALL_PDF_COMBINED].triggered.connect(
+            lambda checked=False: self.export_all_combined_pdf()
         )
         menu_actions[MenuAction.EXPORT_CURRENT].triggered.connect(
             lambda checked=False: self.export_current("png")
@@ -130,6 +138,42 @@ class MainWindow(qt.QMainWindow):
                 "Export",
                 "Export failed: missing .json next to the loaded .html.",
             )
+
+    def export_all_combined_pdf(self):
+        viewers = self.nav_bar.get_all_viewers()
+        if not viewers:
+            qt.QMessageBox.warning(self, "Export", "No plots loaded")
+            return
+
+        file_path, _ = qt.QFileDialog.getSaveFileName(
+            self, "Export Combined PDF", "all_plots.pdf", "PDF Files (*.pdf)"
+        )
+        if not file_path:
+            return
+
+        c = rl_canvas.Canvas(file_path)
+        exported = 0
+
+        for viewer in viewers:
+            fig = viewer._resolve_figure()
+            if fig is None:
+                continue
+            try:
+                img_bytes = fig.to_image(format="png", scale=2)
+                img_reader = ImageReader(io.BytesIO(img_bytes))
+                w, h = img_reader.getSize()
+                c.setPageSize((w, h))
+                c.drawImage(img_reader, 0, 0, w, h)
+                c.showPage()
+                exported += 1
+            except Exception as e:
+                print(f"Skipping plot: {e}")
+
+        if exported == 0:
+            qt.QMessageBox.warning(self, "Export", "No plots could be exported.")
+            return
+
+        c.save()
 
     def export_all(self, fmt: str):
 

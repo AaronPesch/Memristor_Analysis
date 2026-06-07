@@ -83,7 +83,7 @@ def build_stack_level_cdf_figs(
                         marker=dict(size=4),
                         line=dict(color=color_map.get(device), width=2),
                         opacity=0.8,
-                        legendgroup="devices",
+                        legendgroup=device,
                         hovertemplate="%{x}<br>%{y:.1f}%<extra></extra>",
                     )
                 )

@@ -68,7 +68,7 @@ def build_boxplots_figs(box_table: "pd.DataFrame", sets: list[str]) -> list[go.F
                     fillcolor=color_map.get(s),
                     opacity=0.7,
                     boxpoints=False,
-                    legendgroup="individual",
+                    legendgroup=s,
                 )
             )
 

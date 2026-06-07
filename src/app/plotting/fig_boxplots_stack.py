@@ -91,7 +91,7 @@ def build_stack_level_boxplots(
                     opacity=0.7,
                     boxpoints=False,
                     boxmean=False,
-                    legendgroup="devices",
+                    legendgroup=device,
                 )
             )
 

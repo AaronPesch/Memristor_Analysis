@@ -80,7 +80,7 @@ def build_cdf_figs(cdf_table: "pd.DataFrame", sets: list[str]) -> list[go.Figure
                         marker=dict(size=4),
                         line=dict(color=color_map.get(s), width=1.5),
                         opacity=0.6,
-                        legendgroup="individual",
+                        legendgroup=s,
                         hovertemplate="%{x}<br>%{y:.1f}%<extra></extra>",
                     )
                 )

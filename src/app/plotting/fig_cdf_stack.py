@@ -1,9 +1,8 @@
 from __future__ import annotations
 import pandas as pd
 import plotly.graph_objects as go
-import plotly.express as px
 from .fig_cdf import _cdf_xy
-from .utils import has_valid_data, find_device_sets, log_axis_config
+from .utils import gradient_colors, has_valid_data, find_device_sets, log_axis_config
 
 
 def build_stack_level_cdf_figs(
@@ -40,7 +39,7 @@ def build_stack_level_cdf_figs(
     if "R_pristine" not in param_map and r_pristine_by_device:
         param_map["R_pristine"] = {"pretty": "R_pristine (Ω)", "scale": "log"}
 
-    cols = px.colors.sample_colorscale("Viridis", max(len(devices), 2))
+    cols = gradient_colors(max(len(devices), 1))
     color_map = {d: cols[i] for i, d in enumerate(devices)}
 
     figures = []

@@ -2,8 +2,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-import plotly.express as px
-from .utils import has_valid_data
+from .utils import gradient_colors, has_valid_data
 
 
 def build_boxplots_figs(box_table: "pd.DataFrame", sets: list[str]) -> list[go.Figure]:
@@ -28,7 +27,7 @@ def build_boxplots_figs(box_table: "pd.DataFrame", sets: list[str]) -> list[go.F
         "I_leakage_pristine": {"pretty": "I_leakage pristine (A)", "scale": "log"},
     }
 
-    cols = px.colors.sample_colorscale("Viridis", max(len(sets), 2))
+    cols = gradient_colors(max(len(sets), 1))
     color_map = {s: cols[i] for i, s in enumerate(sets)}
 
     tick_vals = [10.0**i for i in range(-15, 16)]

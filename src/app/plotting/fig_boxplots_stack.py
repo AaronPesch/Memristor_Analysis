@@ -2,8 +2,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-import plotly.express as px
-from .utils import has_valid_data, find_device_sets
+from .utils import gradient_colors, has_valid_data, find_device_sets
 
 
 def build_stack_level_boxplots(
@@ -40,7 +39,7 @@ def build_stack_level_boxplots(
     if "R_pristine" not in param_map and r_pristine_by_device:
         param_map["R_pristine"] = {"pretty": "R_pristine (Ω)", "scale": "log"}
 
-    cols = px.colors.sample_colorscale("Viridis", max(len(devices), 2))
+    cols = gradient_colors(max(len(devices), 1))
     color_map = {d: cols[i] for i, d in enumerate(devices)}
 
     tick_vals = [10.0**i for i in range(-15, 16)]

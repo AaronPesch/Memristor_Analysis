@@ -2,8 +2,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-import plotly.express as px
-from .utils import has_valid_data
+from .utils import gradient_colors, has_valid_data
 
 
 def build_endurance_figs(end_df: "pd.DataFrame", sets: list[str]) -> list[go.Figure]:
@@ -24,8 +23,8 @@ def build_endurance_figs(end_df: "pd.DataFrame", sets: list[str]) -> list[go.Fig
         "Memory_window": {"pretty": "Memory Window (Ω)", "scale": "log"},
     }
 
-    cols = px.colors.qualitative.Plotly
-    color_map = {s: cols[i % len(cols)] for i, s in enumerate(sets)}
+    cols = gradient_colors(max(len(sets), 1))
+    color_map = {s: cols[i] for i, s in enumerate(sets)}
 
     tick_vals = [10.0**i for i in range(-15, 16)]
     tick_text = [f"1e{i}" if i != 0 else "1" for i in range(-15, 16)]

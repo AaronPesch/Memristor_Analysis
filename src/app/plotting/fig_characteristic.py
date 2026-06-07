@@ -2,7 +2,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-import plotly.express as px
+from .utils import gradient_colors, _RESET_LOW, _RESET_HIGH
 
 
 def build_characteristic_figs(
@@ -22,15 +22,12 @@ def build_characteristic_figs(
     if raw_by_reset is None:
         raw_by_reset = {}
 
-    base_cols = px.colors.qualitative.Plotly
-    set_color_map = {s: base_cols[i % len(base_cols)] for i, s in enumerate(sets)}
+    set_cols = gradient_colors(max(len(sets), 1))
+    set_color_map = {s: set_cols[i] for i, s in enumerate(sets)}
 
-    # Use a different color palette offset for reset files so they're visually distinct
     all_reset_keys = list(raw_by_reset.keys())
-    reset_color_map = {
-        s: base_cols[(i + len(sets)) % len(base_cols)]
-        for i, s in enumerate(all_reset_keys)
-    }
+    reset_cols = gradient_colors(max(len(all_reset_keys), 1), low=_RESET_LOW, high=_RESET_HIGH)
+    reset_color_map = {s: reset_cols[i] for i, s in enumerate(all_reset_keys)}
 
     tick_vals = [10.0**i for i in range(-15, 1)]
     tick_text = [f"1e{i}" if i != 0 else "1" for i in range(-15, 1)]

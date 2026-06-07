@@ -1,5 +1,28 @@
 from __future__ import annotations
 import pandas as pd
+import plotly.colors as pc
+
+_RESET_LOW = "rgb(44, 160, 44)"    # green
+_RESET_HIGH = "rgb(148, 103, 189)" # purple
+
+
+def gradient_colors(
+    n: int,
+    low: str | None = None,
+    high: str | None = None,
+) -> list[str]:
+    """Return n colours along a gradient.
+
+    Without low/high: samples Turbo for a full-spectrum rainbow.
+    With low and high: interpolates between those two colours.
+    """
+    if n <= 0:
+        return []
+    if low is not None and high is not None:
+        if n == 1:
+            return [low]
+        return pc.n_colors(low, high, n, colortype="rgb")
+    return pc.sample_colorscale("Turbo", max(n, 1))
 
 
 def has_valid_data(

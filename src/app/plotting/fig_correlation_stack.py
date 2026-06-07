@@ -2,8 +2,7 @@ from __future__ import annotations
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-import plotly.express as px
-from .utils import has_valid_data, find_device_sets
+from .utils import gradient_colors, has_valid_data, find_device_sets
 
 
 def build_stack_level_correlation_figs(
@@ -39,8 +38,8 @@ def build_stack_level_correlation_figs(
     def get_scale(col_name):
         return "log" if any(x in col_name for x in ["I_", "R_"]) else "linear"
 
-    base_cols = px.colors.qualitative.Plotly
-    device_color_map = {d: base_cols[i % len(base_cols)] for i, d in enumerate(devices)}
+    cols = gradient_colors(max(len(devices), 1))
+    device_color_map = {d: cols[i] for i, d in enumerate(devices)}
 
     tick_vals = [10.0**i for i in range(-15, 16)]
     tick_text = [f"1e{i}" if i != 0 else "1" for i in range(-15, 16)]

@@ -2,8 +2,7 @@ from __future__ import annotations
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-import plotly.express as px
-from .utils import has_valid_data
+from .utils import gradient_colors, has_valid_data
 
 
 def build_correlation_scatter_figs(
@@ -32,8 +31,8 @@ def build_correlation_scatter_figs(
         return "log" if any(x in col_name for x in ["I_", "R_"]) else "linear"
 
     # 2. Setup Colors
-    base_cols = px.colors.qualitative.Plotly
-    set_color_map = {s: base_cols[i % len(base_cols)] for i, s in enumerate(sets)}
+    cols = gradient_colors(max(len(sets), 1))
+    set_color_map = {s: cols[i] for i, s in enumerate(sets)}
 
     # 3. Log Ticks logic
     tick_vals = [10.0**i for i in range(-15, 16)]

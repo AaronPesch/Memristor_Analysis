@@ -4,9 +4,6 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 
-# G0: conductance quantum in Siemens
-G0 = 7.748e-5
-
 
 def build_characteristic_figs(
     raw_by_set: dict[str, "pd.DataFrame"],
@@ -96,7 +93,7 @@ def build_characteristic_figs(
             )
 
     fig1.update_xaxes(
-        title_text="AV (V)",
+        title_text="Voltage (V)",
         autorange=True,
         gridcolor="#E5E5E5",
         zeroline=True,
@@ -141,8 +138,7 @@ def build_characteristic_figs(
         for idx, cyc in enumerate(cycles):
             tiny = df[df["cycle_number"] == cyc]
 
-            # Normalize conductance by G0
-            y_vals = pd.to_numeric(tiny["NORM_COND"], errors="coerce") / G0
+            y_vals = pd.to_numeric(tiny["NORM_COND"], errors="coerce")
 
             fig2.add_trace(
                 go.Scatter(
@@ -159,7 +155,7 @@ def build_characteristic_figs(
             )
 
     fig2.update_xaxes(
-        title_text="AV (V)",
+        title_text="Voltage (V)",
         autorange="reversed",
         gridcolor="#E5E5E5",
         zeroline=True,
@@ -167,7 +163,7 @@ def build_characteristic_figs(
     )
     fig2.update_yaxes(
         type="linear",
-        title_text="G/G₀",
+        title_text="Normalized conductance (G/G₀)",
         gridcolor="#E5E5E5",
         zeroline=True,
         zerolinecolor="gray",

@@ -17,14 +17,14 @@ class MenuAction(Enum):
     EXPORT_ALL_CSV = ("CSV", None, False)
     EXPORT_ALL_TXT = ("TXT", None, False)
 
-    EXPORT_CURRENT = ("Current", "Ctrl+E", False)
-    EXPORT_CURRENT_PNG = ("PNG", None, False)
-    EXPORT_CURRENT_JPEG = ("JPEG", None, False)
-    EXPORT_CURRENT_EPS = ("EPS", None, False)
-    EXPORT_CURRENT_SVG = ("SVG", None, False)
-    EXPORT_CURRENT_PDF = ("PDF", None, False)
-    EXPORT_CURRENT_CSV = ("CSV", None, False)
-    EXPORT_CURRENT_TXT = ("TXT", None, False)
+    EXPORT_CURRENT = ("Current", "Ctrl+E", False, 1)
+    EXPORT_CURRENT_PNG = ("PNG", None, False, 1)
+    EXPORT_CURRENT_JPEG = ("JPEG", None, False, 1)
+    EXPORT_CURRENT_EPS = ("EPS", None, False, 1)
+    EXPORT_CURRENT_SVG = ("SVG", None, False, 1)
+    EXPORT_CURRENT_PDF = ("PDF", None, False, 1)
+    EXPORT_CURRENT_CSV = ("CSV", None, False, 1)
+    EXPORT_CURRENT_TXT = ("TXT", None, False, 1)
 
     # EXIT
     EXIT = ("Exit", "Ctrl+Q", False)
@@ -32,7 +32,7 @@ class MenuAction(Enum):
     # HELP MENU
     VIEW_HELP = ("View Help", "F1", False)
 
-    def __init__(self, text, shortcut=None, checkable=False):
+    def __init__(self, text, shortcut=None, checkable=False, _scope=None):
         self.text = text
         self.shortcut = shortcut
         self.checkable = checkable

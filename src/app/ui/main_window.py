@@ -139,7 +139,8 @@ class MainWindow(qt.QMainWindow):
 
         for i, viewer in enumerate(viewers):
             if getattr(viewer, "html_path", None):
-                filename = Path(viewer.html_path).stem
+                html = Path(viewer.html_path)
+                filename = f"{html.parent.name}_{html.stem}"
             else:
                 filename = f"plot_{i}"
 

@@ -126,7 +126,7 @@ class NavigationBar(qt.QTabWidget):
 
         if level_text == Mode.DEVICE.value:
             base_dir = self.temp_device_dir
-            char_labels = {"AI": "Current (A)", "NORM_COND": "Conductance (S)"}
+            char_labels = {"AI": "|Current| vs Voltage", "NORM_COND": "Normalized conductance"}
 
             self.addTab(
                 self._create_nested_tab(
@@ -161,8 +161,8 @@ class NavigationBar(qt.QTabWidget):
         elif level_text == Mode.STACK.value:
             base_dir = self.temp_stack_dir
             char_labels = {
-                "AI": "Current (A)",
-                "NORM_COND": "Conductance (S)",
+                "AI": "|Current| vs Voltage",
+                "NORM_COND": "Normalized conductance",
                 "butterfly_curve": "Butterfly",
             }
 

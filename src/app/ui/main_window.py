@@ -40,6 +40,13 @@ class MainWindow(qt.QMainWindow):
             lambda: self.handle_import(mode=Mode.STACK)
         )
 
+        menu_actions[MenuAction.EXPORT_ALL].triggered.connect(
+            lambda checked=False: self.export_all("png")
+        )
+        menu_actions[MenuAction.EXPORT_CURRENT].triggered.connect(
+            lambda checked=False: self.export_current("png")
+        )
+
         # Export menu for current
         menu_actions[MenuAction.EXPORT_CURRENT_PNG].triggered.connect(
             lambda checked=False: self.export_current("png")

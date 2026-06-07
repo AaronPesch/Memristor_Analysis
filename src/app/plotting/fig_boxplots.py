@@ -129,7 +129,7 @@ def build_boxplots_figs(box_table: "pd.DataFrame", sets: list[str]) -> list[go.F
                 zerolinecolor="gray",
             )
 
-        fig.update_xaxes(title_text="Set / File", showgrid=True, gridcolor="#E5E5E5")
+        fig.update_xaxes(title_text="Set / File", showgrid=True, gridcolor="#E5E5E5", showticklabels=False)
 
         fig.update_layout(
             title=f"Boxplot – {info['pretty']} ({info['scale'].capitalize()} Scale)",

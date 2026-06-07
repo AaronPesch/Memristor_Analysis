@@ -159,7 +159,7 @@ def build_stack_level_boxplots(
                 zerolinecolor="gray",
             )
 
-        fig.update_xaxes(title_text="Device", showgrid=True, gridcolor="#E5E5E5")
+        fig.update_xaxes(title_text="Device", showgrid=True, gridcolor="#E5E5E5", showticklabels=False)
 
         fig.update_layout(
             title=f"Stack {stack_id} – {info['pretty']} ({info['scale'].capitalize()} Scale)",

@@ -26,7 +26,9 @@ def build_characteristic_figs(
     set_color_map = {s: set_cols[i] for i, s in enumerate(sets)}
 
     all_reset_keys = list(raw_by_reset.keys())
-    reset_cols = gradient_colors(max(len(all_reset_keys), 1), low=_RESET_LOW, high=_RESET_HIGH)
+    reset_cols = gradient_colors(
+        max(len(all_reset_keys), 1), low=_RESET_LOW, high=_RESET_HIGH
+    )
     reset_color_map = {s: reset_cols[i] for i, s in enumerate(all_reset_keys)}
 
     tick_vals = [10.0**i for i in range(-15, 1)]

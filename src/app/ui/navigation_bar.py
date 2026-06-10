@@ -126,7 +126,10 @@ class NavigationBar(qt.QTabWidget):
 
         if level_text == Mode.DEVICE.value:
             base_dir = self.temp_device_dir
-            char_labels = {"AI": "|Current| vs Voltage", "NORM_COND": "Normalized conductance"}
+            char_labels = {
+                "AI": "|Current| vs Voltage",
+                "NORM_COND": "Normalized conductance",
+            }
 
             self.addTab(
                 self._create_nested_tab(

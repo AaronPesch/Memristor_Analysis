@@ -2,8 +2,8 @@ from __future__ import annotations
 import pandas as pd
 import plotly.colors as pc
 
-_RESET_LOW = "rgb(44, 160, 44)"    # green
-_RESET_HIGH = "rgb(148, 103, 189)" # purple
+_RESET_LOW = "rgb(44, 160, 44)"  # green
+_RESET_HIGH = "rgb(148, 103, 189)"  # purple
 
 
 def gradient_colors(

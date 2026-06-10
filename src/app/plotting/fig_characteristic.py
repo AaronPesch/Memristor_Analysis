@@ -5,6 +5,7 @@ import plotly.graph_objects as go
 from .utils import gradient_colors, _RESET_LOW, _RESET_HIGH
 
 
+
 def build_characteristic_figs(
     raw_by_set: dict[str, "pd.DataFrame"],
     sets: list[str],
@@ -124,7 +125,7 @@ def build_characteristic_figs(
     )
     figures.append(fig1)
 
-    # ── Fig 2: Normalized Conductance (G/G0) vs AV ─────────────────────────
+    # ── Fig 2: Normalized Conductance (G/G0) vs V (set + reset) ─────────────
     fig2 = go.Figure()
 
     for s in sets:
@@ -134,7 +135,6 @@ def build_characteristic_figs(
 
         for idx, cyc in enumerate(cycles):
             tiny = df[df["cycle_number"] == cyc]
-
             y_vals = pd.to_numeric(tiny["NORM_COND"], errors="coerce")
 
             fig2.add_trace(
@@ -144,19 +144,47 @@ def build_characteristic_figs(
                     mode="lines",
                     line=dict(color=color, width=1.2),
                     opacity=0.5,
-                    name=s,
+                    name=f"{s} (set)",
                     legendgroup=s,
                     showlegend=(idx == 0),
                     hovertemplate=f"Set: {s}<br>Cycle: {cyc}<br>V: %{{x}}V<br>G/G₀: %{{y:.3f}}<extra></extra>",
                 )
             )
 
+    for s, df_reset in raw_by_reset.items():
+        if df_reset.empty:
+            continue
+        cycles = df_reset["cycle_number"].unique()
+        color = reset_color_map.get(s, "#888888")
+
+        for idx, cyc in enumerate(cycles):
+            tiny = df_reset[df_reset["cycle_number"] == cyc]
+            y_vals = pd.to_numeric(tiny["NORM_COND"], errors="coerce")
+            x_vals = tiny["AV"]
+
+            fig2.add_trace(
+                go.Scatter(
+                    x=x_vals,
+                    y=y_vals,
+                    mode="lines",
+                    line=dict(color=color, width=1.2, dash="dot"),
+                    opacity=0.5,
+                    name=f"{s} (reset)",
+                    legendgroup=f"{s}_reset",
+                    showlegend=(idx == 0),
+                    hovertemplate=f"Reset: {s}<br>Cycle: {cyc}<br>V: %{{x}}V<br>G/G₀: %{{y:.3f}}<extra></extra>",
+                )
+            )
+
+    fig2.add_vline(x=0, line_width=2, line_color="black")
+
     fig2.update_xaxes(
         title_text="Voltage (V)",
-        autorange="reversed",
+        autorange=True,
         gridcolor="#E5E5E5",
         zeroline=True,
-        zerolinecolor="gray",
+        zerolinecolor="black",
+        zerolinewidth=2,
     )
     fig2.update_yaxes(
         type="linear",
@@ -167,7 +195,7 @@ def build_characteristic_figs(
         autorange=True,
     )
     fig2.update_layout(
-        title="Characteristic Plot – Normalized Conductance (G/G₀) vs V",
+        title="Characteristic Plot – Normalized Conductance (G/G₀) vs V (Set + Reset)",
         width=1000,
         height=700,
         template="plotly_white",

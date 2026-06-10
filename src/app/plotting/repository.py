@@ -75,7 +75,7 @@ class MemristorRepository:
     def load_endurance_cycles_for_reset(self, source_file: str) -> pd.DataFrame:
         return self.conn.execute(
             """
-            SELECT cycle_number, Time, AV, AI, VRESET, IRESET
+            SELECT cycle_number, Time, AV, AI, VRESET, IRESET, NORM_COND
             FROM cycles
             WHERE source_file = ?
             ORDER BY cycle_number, Time

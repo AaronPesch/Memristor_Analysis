@@ -2,6 +2,9 @@ import io
 import shutil
 from pathlib import Path
 
+from pptx import Presentation
+from pptx.util import Inches
+
 import PySide6.QtWidgets as qt
 from PySide6.QtCore import QThread, Qt, QUrl
 from PySide6.QtGui import QDesktopServices
@@ -50,6 +53,9 @@ class MainWindow(qt.QMainWindow):
         )
         menu_actions[MenuAction.EXPORT_ALL_PDF_COMBINED].triggered.connect(
             lambda checked=False: self.export_all_combined_pdf()
+        )
+        menu_actions[MenuAction.EXPORT_ALL_PPTX].triggered.connect(
+            lambda checked=False: self.export_all_combined_pptx()
         )
         menu_actions[MenuAction.EXPORT_CURRENT].triggered.connect(
             lambda checked=False: self.export_current("png")
@@ -138,6 +144,47 @@ class MainWindow(qt.QMainWindow):
                 "Export",
                 "Export failed: missing .json next to the loaded .html.",
             )
+
+    def export_all_combined_pptx(self):
+        viewers = self.nav_bar.get_all_viewers()
+        if not viewers:
+            qt.QMessageBox.warning(self, "Export", "No plots loaded")
+            return
+
+        file_path, _ = qt.QFileDialog.getSaveFileName(
+            self, "Export PowerPoint", "all_plots.pptx", "PowerPoint Files (*.pptx)"
+        )
+        if not file_path:
+            return
+
+        prs = Presentation()
+        prs.slide_width = Inches(13.333)
+        prs.slide_height = Inches(7.5)
+        blank_layout = prs.slide_layouts[6]
+        exported = 0
+
+        for viewer in viewers:
+            fig = viewer._resolve_figure()
+            if fig is None:
+                continue
+            try:
+                fig = viewer._prepare_for_export(fig)
+                img_bytes = fig.to_image(format="png", scale=2)
+                slide = prs.slides.add_slide(blank_layout)
+                slide.shapes.add_picture(
+                    io.BytesIO(img_bytes), 0, 0,
+                    width=prs.slide_width,
+                    height=prs.slide_height,
+                )
+                exported += 1
+            except Exception as e:
+                print(f"Skipping plot: {e}")
+
+        if exported == 0:
+            qt.QMessageBox.warning(self, "Export", "No plots could be exported.")
+            return
+
+        prs.save(file_path)
 
     def export_all_combined_pdf(self):
         viewers = self.nav_bar.get_all_viewers()

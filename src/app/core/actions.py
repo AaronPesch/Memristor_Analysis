@@ -15,6 +15,7 @@ class MenuAction(Enum):
     EXPORT_ALL_SVG = ("SVG", None, False)
     EXPORT_ALL_PDF = ("PDF", None, False)
     EXPORT_ALL_PDF_COMBINED = ("PDF (combined)", None, False)
+    EXPORT_ALL_PPTX = ("PowerPoint", None, False)
     EXPORT_ALL_CSV = ("CSV", None, False)
     EXPORT_ALL_TXT = ("TXT", None, False)
 

@@ -11,6 +11,8 @@ from svglib.svglib import svg2rlg
 from reportlab.graphics import renderPS
 import tempfile
 
+_LEGEND_PX_PER_ENTRY = 35
+
 
 class PlotViewer(QWidget):
     def __init__(self, figure=None):
@@ -66,15 +68,27 @@ class PlotViewer(QWidget):
             """
             self.browser.page().runJavaScript(js)
 
+    @staticmethod
+    def _prepare_for_export(fig):
+        """Return a figure with height expanded to fit all legend entries, if needed."""
+        n = sum(1 for t in fig.data if getattr(t, "showlegend", True) is not False)
+        current_h = fig.layout.height or 700
+        needed = max(current_h, n * _LEGEND_PX_PER_ENTRY)
+        if needed > current_h:
+            fig = pio.from_json(fig.to_json())
+            fig.update_layout(height=needed, legend=dict(maxheight=needed))
+        return fig
+
     def export_image(self, out_path: str, fmt: str) -> bool:
         fmt = fmt.lower().strip()
 
         if self.figure is not None:
+            fig = self._prepare_for_export(self.figure)
             if fmt == "eps":
                 with tempfile.NamedTemporaryFile(suffix=".svg", delete=False) as tmp:
                     svg_path = tmp.name
                 try:
-                    self.figure.write_image(svg_path, format="svg")
+                    fig.write_image(svg_path, format="svg")
 
                     drawing = svg2rlg(svg_path)
                     if drawing is None:
@@ -92,9 +106,8 @@ class PlotViewer(QWidget):
                     if os.path.exists(svg_path):
                         os.remove(svg_path)
 
-            # Non-EPS live figure
             try:
-                self.figure.write_image(out_path, format=fmt)
+                fig.write_image(out_path, format=fmt)
                 return True
             except Exception as e:
                 print(f"Export error: {e}")
@@ -109,6 +122,7 @@ class PlotViewer(QWidget):
             return False
 
         fig = pio.from_json(json_path.read_text(encoding="utf-8"))
+        fig = self._prepare_for_export(fig)
 
         if fmt == "eps":
             with tempfile.NamedTemporaryFile(suffix=".svg", delete=False) as tmp:

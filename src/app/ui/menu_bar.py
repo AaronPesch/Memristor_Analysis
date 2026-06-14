@@ -53,6 +53,9 @@ class MenuBar(qt.QMenuBar):
         self.file_sub_menu_export_all.addAction(
             self.menu_actions[MenuAction.EXPORT_ALL_PDF_COMBINED]
         )
+        self.file_sub_menu_export_all.addAction(
+            self.menu_actions[MenuAction.EXPORT_ALL_PPTX]
+        )
         self.file_sub_menu_export_all.addSeparator()
         self.file_sub_menu_export_all.addAction(
             self.menu_actions[MenuAction.EXPORT_ALL_CSV]

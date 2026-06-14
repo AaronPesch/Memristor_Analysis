@@ -1,4 +1,5 @@
 from __future__ import annotations
+import re
 import pandas as pd
 import plotly.colors as pc
 
@@ -23,6 +24,42 @@ def gradient_colors(
             return [low]
         return pc.n_colors(low, high, n, colortype="rgb")
     return pc.sample_colorscale("Turbo", max(n, 1))
+
+
+def _parse_rgb(color: str) -> tuple[int, int, int]:
+    """Parse 'rgb(r, g, b)' or '#rrggbb' to (r, g, b) integers."""
+    m = re.match(r"rgb\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*\)", color)
+    if m:
+        return int(float(m.group(1))), int(float(m.group(2))), int(float(m.group(3)))
+    m = re.match(r"#([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})", color)
+    if m:
+        return int(m.group(1), 16), int(m.group(2), 16), int(m.group(3), 16)
+    raise ValueError(f"Cannot parse color: {color}")
+
+
+def hue_spread_colors(n: int) -> list[str]:
+    """Return n distinct colors drawn from the Dark24 qualitative palette."""
+    from plotly.colors import qualitative
+    palette = qualitative.Dark2
+    return [palette[i % len(palette)] for i in range(n)]
+
+
+def cycle_colors(base_color: str, n: int) -> list[str]:
+    """Return n colors fading from base_color toward white.
+
+    Total fade scales with cycle count (~5% per cycle, capped at 75%) so
+    few cycles barely fade and many cycles show a clear gradient.
+    """
+    if n <= 1:
+        return [base_color]
+
+    r, g, b = _parse_rgb(base_color)
+    fade = min(0.75, (n - 1) * 0.05)
+    lr = int(r + (255 - r) * fade)
+    lg = int(g + (255 - g) * fade)
+    lb = int(b + (255 - b) * fade)
+
+    return pc.n_colors(f"rgb({r},{g},{b})", f"rgb({lr},{lg},{lb})", n, colortype="rgb")
 
 
 def has_valid_data(

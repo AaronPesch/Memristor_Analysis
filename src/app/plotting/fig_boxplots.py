@@ -61,6 +61,7 @@ def build_boxplots_figs(box_table: "pd.DataFrame", sets: list[str]) -> list[go.F
                 go.Box(
                     y=vals,
                     name=s,
+                    width=0.3,
                     marker_color=color_map.get(s),
                     boxmean=False,
                     line=dict(width=2),
@@ -84,6 +85,7 @@ def build_boxplots_figs(box_table: "pd.DataFrame", sets: list[str]) -> list[go.F
                 go.Box(
                     y=all_vals,
                     name="All Data (unified)",
+                    width=0.3,
                     marker_color="black",
                     boxmean=False,
                     line=dict(width=2.5, color="black"),
@@ -137,11 +139,12 @@ def build_boxplots_figs(box_table: "pd.DataFrame", sets: list[str]) -> list[go.F
 
         fig.update_layout(
             title=f"Boxplot – {info['pretty']} ({info['scale'].capitalize()} Scale)",
-            width=900,
+            width=max(900, (len(sets) + 1) * 70),
             height=600,
             template="plotly_white",
             showlegend=True,
             boxmode="group",
+            boxgap=0.1,
             meta={"param_id": param},
         )
 

@@ -84,6 +84,7 @@ def build_stack_level_boxplots(
                 go.Box(
                     y=vals,
                     name=device,
+                    width=0.3,
                     marker_color=color_map.get(device),
                     line=dict(width=2),
                     fillcolor=color_map.get(device),
@@ -114,6 +115,7 @@ def build_stack_level_boxplots(
                 go.Box(
                     y=all_vals,
                     name="All Devices (unified)",
+                    width=0.3,
                     marker_color="black",
                     line=dict(width=2.5, color="black"),
                     fillcolor="rgba(0,0,0,0.15)",
@@ -167,11 +169,12 @@ def build_stack_level_boxplots(
 
         fig.update_layout(
             title=f"Stack {stack_id} – {info['pretty']} ({info['scale'].capitalize()} Scale)",
-            width=900,
+            width=max(900, (len(devices) + 1) * 70),
             height=600,
             template="plotly_white",
             showlegend=True,
             boxmode="group",
+            boxgap=0.1,
             meta={"param_id": param, "level": "stack", "stack_id": stack_id},
         )
 

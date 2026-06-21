@@ -17,7 +17,9 @@ from app.core.modes import Mode
 
 
 def _write(fig, out_path) -> None:
-    fig.write_html(out_path)
+    width = getattr(fig.layout, "width", None) or 900
+    config = {"responsive": False} if width > 900 else {}
+    fig.write_html(out_path, config=config)
     print("Wrote:", out_path)
 
 

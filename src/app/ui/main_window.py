@@ -206,6 +206,7 @@ class MainWindow(qt.QMainWindow):
             if fig is None:
                 continue
             try:
+                fig = viewer._prepare_for_export(fig)
                 img_bytes = fig.to_image(format="png", scale=2)
                 img_reader = ImageReader(io.BytesIO(img_bytes))
                 w, h = img_reader.getSize()

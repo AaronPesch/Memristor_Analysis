@@ -40,6 +40,7 @@ def _parse_rgb(color: str) -> tuple[int, int, int]:
 def hue_spread_colors(n: int) -> list[str]:
     """Return n distinct colors drawn from the Dark24 qualitative palette."""
     from plotly.colors import qualitative
+
     palette = qualitative.Dark2
     return [palette[i % len(palette)] for i in range(n)]
 

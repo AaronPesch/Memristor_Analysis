@@ -172,7 +172,9 @@ class MainWindow(qt.QMainWindow):
                 img_bytes = fig.to_image(format="png", scale=2)
                 slide = prs.slides.add_slide(blank_layout)
                 slide.shapes.add_picture(
-                    io.BytesIO(img_bytes), 0, 0,
+                    io.BytesIO(img_bytes),
+                    0,
+                    0,
                     width=prs.slide_width,
                     height=prs.slide_height,
                 )

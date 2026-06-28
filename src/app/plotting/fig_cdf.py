@@ -43,6 +43,7 @@ def build_cdf_figs(cdf_table: "pd.DataFrame", sets: list[str]) -> list[go.Figure
         "I_reset_max": {"pretty": "I_reset_max (A)", "scale": "log"},
         "V_forming": {"pretty": "V_forming (V)", "scale": "linear"},
         "I_leakage_pristine": {"pretty": "I_leakage pristine (A)", "scale": "log"},
+        "Memory_window": {"pretty": "Memory Window", "scale": "log"},
     }
 
     cols = gradient_colors(max(len(sets), 1))

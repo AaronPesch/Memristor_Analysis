@@ -195,6 +195,8 @@ def build_cdf_table(
             out["source_file"], leakage_i, stack_id
         )
 
+    out["Memory_window"] = out["R_HRS"] / out["R_LRS"]
+
     return out
 
 

@@ -91,7 +91,3 @@ jobs:
               echo "Smoke Test Passed: Application initialized and exited cleanly."
             fi
           fi
-            else
-              echo "Smoke Test Passed: Application initialized and exited cleanly."
-            fi
-          fi

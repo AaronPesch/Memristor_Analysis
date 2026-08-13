@@ -1,5 +1,6 @@
 import os
 import shutil
+import traceback
 from pathlib import Path
 
 from PySide6.QtCore import QObject, Signal, Slot
@@ -67,4 +68,6 @@ class ImportWorker(QObject):
 
         except Exception as e:
             # If anything fails in the converter OR the plotting script, catch it here
-            self.error.emit(str(e))
+            tb = traceback.format_exc()
+            print(tb)  # full traceback to console
+            self.error.emit(f"{e}\n\n{tb}")

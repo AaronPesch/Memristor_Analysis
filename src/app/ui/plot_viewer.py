@@ -19,6 +19,7 @@ class PlotViewer(QWidget):
         super().__init__()
         self.figure = figure
         self.html_path: str | None = None
+        self.default_scale: str | None = None
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)  # Remove padding
 
@@ -40,17 +41,19 @@ class PlotViewer(QWidget):
             )
 
     def load_html_file(self, file_path: str):
-        """
-        Testing Method: Loads a local .html file directly into the browser.
-        """
         if os.path.exists(file_path):
-            # storing path
             self.html_path = file_path
-            # Convert absolute path to a URL format the browser understands
             local_url = QUrl.fromLocalFile(os.path.abspath(file_path))
             self.browser.load(local_url)
+            if self.default_scale:
+                self.browser.loadFinished.connect(self._apply_default_scale)
         else:
             print(f"Error: File not found at {file_path}")
+
+    def _apply_default_scale(self, ok: bool):
+        self.browser.loadFinished.disconnect(self._apply_default_scale)
+        if ok and self.default_scale:
+            self.set_scale(self.default_scale)
 
     def set_scale(self, scale_type: str):
         if self.figure is not None:

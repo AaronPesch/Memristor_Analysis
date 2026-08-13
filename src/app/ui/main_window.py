@@ -13,6 +13,7 @@ from reportlab.pdfgen import canvas as rl_canvas
 
 from ..converter import BatchConverter, path_to_glob
 from ..core import MenuAction, Mode
+from ..core.preferences import get_scale, set_scale as save_scale_pref
 from .import_worker import ImportWorker
 from .menu_bar import MenuBar
 from .navigation_bar import NavigationBar
@@ -32,6 +33,22 @@ class MainWindow(qt.QMainWindow):
         central_widget = qt.QWidget()
         self.setCentralWidget(central_widget)
         self.main_layout = qt.QVBoxLayout(central_widget)
+
+        # Scale toggle bar
+        scale_bar = qt.QWidget()
+        sb_layout = qt.QHBoxLayout(scale_bar)
+        sb_layout.setContentsMargins(6, 2, 6, 2)
+        sb_layout.addWidget(qt.QLabel("Y-Axis:"))
+        self.btn_log = qt.QPushButton("Log")
+        self.btn_linear = qt.QPushButton("Linear")
+        for btn in (self.btn_log, self.btn_linear):
+            btn.setCheckable(True)
+            btn.setFixedWidth(64)
+        sb_layout.addWidget(self.btn_log)
+        sb_layout.addWidget(self.btn_linear)
+        sb_layout.addStretch()
+        self.main_layout.addWidget(scale_bar)
+
         self.nav_bar = NavigationBar()
         self.main_layout.addWidget(self.nav_bar)
 
@@ -39,6 +56,11 @@ class MainWindow(qt.QMainWindow):
         menu_actions = self.menu_bar.menu_actions
 
         menu_actions[MenuAction.EXIT].triggered.connect(self.cleanup_and_exit)
+
+        # Scale toggle
+        self.btn_log.clicked.connect(lambda: self._apply_scale("log"))
+        self.btn_linear.clicked.connect(lambda: self._apply_scale("linear"))
+        self.nav_bar.currentChanged.connect(self._sync_scale_buttons)
 
         # Connect Imports (Shortcuts and Menu)
         menu_actions[MenuAction.IMPORT_DEVICE].triggered.connect(
@@ -114,6 +136,37 @@ class MainWindow(qt.QMainWindow):
 
         # Link to GH-Wiki
         menu_actions[MenuAction.VIEW_HELP].triggered.connect(self.open_wiki)
+
+    def _is_scale_applicable(self, viewer) -> bool:
+        if not viewer or not viewer.html_path:
+            return False
+        return "correlation_matri" not in Path(viewer.html_path).parent.name
+
+    def _apply_scale(self, scale: str):
+        viewer = self.nav_bar.get_current_viewer()
+        if viewer is None or not self._is_scale_applicable(viewer):
+            return
+        viewer.set_scale(scale)
+        viewer.default_scale = scale
+        if viewer.html_path:
+            save_scale_pref(viewer.html_path, scale)
+        self.btn_log.setChecked(scale == "log")
+        self.btn_linear.setChecked(scale == "linear")
+
+    def _sync_scale_buttons(self):
+        viewer = self.nav_bar.get_current_viewer()
+        applicable = self._is_scale_applicable(viewer)
+        self.btn_log.setEnabled(applicable)
+        self.btn_linear.setEnabled(applicable)
+        if viewer is None or not applicable:
+            self.btn_log.setChecked(False)
+            self.btn_linear.setChecked(False)
+            return
+        scale = viewer.default_scale
+        if not scale and viewer.html_path:
+            scale = get_scale(viewer.html_path)
+        self.btn_log.setChecked(scale == "log")
+        self.btn_linear.setChecked(scale == "linear")
 
     def export_current(self, fmt: str):
 
@@ -320,11 +373,19 @@ class MainWindow(qt.QMainWindow):
 
     def on_import_success(self):
         self.pd.close()
-        # Force the NavigationBar to reload the tabs (which now have new HTML files)
         self.nav_bar.update_tabs_by_level()
+        self._connect_inner_tab_signals()
+        self._sync_scale_buttons()
         qt.QMessageBox.information(
             self, "Success", "Data imported and plots generated successfully."
         )
+
+    def _connect_inner_tab_signals(self):
+        """Connect currentChanged on each nested QTabWidget so scale buttons sync."""
+        for i in range(self.nav_bar.count()):
+            widget = self.nav_bar.widget(i)
+            if isinstance(widget, qt.QTabWidget):
+                widget.currentChanged.connect(self._sync_scale_buttons)
 
     def on_import_error(self, err_msg):
         self.pd.close()

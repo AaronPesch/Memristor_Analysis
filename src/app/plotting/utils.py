@@ -23,7 +23,11 @@ def gradient_colors(
         if n == 1:
             return [low]
         return pc.n_colors(low, high, n, colortype="rgb")
-    return pc.sample_colorscale("Turbo", max(n, 1))
+    if n == 1:
+        # Passing an int count of 1 makes Plotly divide by (1-1)=0.
+        # A list of explicit sample points avoids that path.
+        return pc.sample_colorscale("Turbo", [0.5])
+    return pc.sample_colorscale("Turbo", n)
 
 
 def _parse_rgb(color: str) -> tuple[int, int, int]:

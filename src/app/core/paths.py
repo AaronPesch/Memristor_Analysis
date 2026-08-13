@@ -20,6 +20,7 @@ def get_app_data_dir() -> Path:
 APP_DATA_PATH = get_app_data_dir()
 DB_FILE = APP_DATA_PATH / "output.duckdb"
 TEMP_DIR = APP_DATA_PATH / "temp"
+PREFS_FILE = APP_DATA_PATH / "preferences.json"
 
 # INITIALIZATION: Re-create folders every time the app starts
 APP_DATA_PATH.mkdir(parents=True, exist_ok=True)

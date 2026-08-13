@@ -6,6 +6,7 @@ from PySide6.QtCore import Qt
 from .plot_viewer import PlotViewer
 from app.core.paths import TEMP_DIR
 from app.core.modes import Mode
+from app.core.preferences import get_scale
 
 
 class NavigationBar(qt.QTabWidget):
@@ -216,6 +217,9 @@ class NavigationBar(qt.QTabWidget):
             file_path = folder_path / f"{param_id}.html"
             if file_path.exists():
                 viewer = PlotViewer()
+                saved = get_scale(str(file_path))
+                if saved and "correlation_matri" not in subfolder_name:
+                    viewer.default_scale = saved
                 viewer.load_html_file(str(file_path))
                 sub_tab_widget.addTab(viewer, label)
                 found_any = True

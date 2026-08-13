@@ -65,19 +65,17 @@ jobs:
         run: sudo apt-get install -y xvfb
 
       - name: Run Smoke Test
+        env:
+          QT_QPA_PLATFORM: offscreen
         run: |
           echo "Starting Built Executable for Smoke Test..."
 
-          # 1. Locate and make the executable runnable
           exePath="dist/MemristorAnalysisTool/MemristorAnalysisTool"
           chmod +x "$exePath"
 
-          # 2. Start the process in the background under a virtual display
-          # We use the --smoke-test flag, same as the Windows workflow
-          xvfb-run --auto-servernum "$exePath" --smoke-test &
+          "$exePath" --smoke-test &
           pid=$!
 
-          # 3. Wait a few seconds to see if it stays alive or crashes
           sleep 10
 
           if kill -0 $pid 2>/dev/null; then
@@ -89,6 +87,10 @@ jobs:
             if [ $exit_code -ne 0 ]; then
               echo "SMOKE TEST FAILED: Application crashed with exit code $exit_code"
               exit 1
+            else
+              echo "Smoke Test Passed: Application initialized and exited cleanly."
+            fi
+          fi
             else
               echo "Smoke Test Passed: Application initialized and exited cleanly."
             fi

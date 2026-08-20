@@ -1,6 +1,7 @@
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 from PySide6.QtCore import QUrl
+from PySide6.QtGui import QColor
 from pathlib import Path
 import plotly.io as pio
 import os
@@ -11,10 +12,15 @@ from svglib.svglib import svg2rlg
 from reportlab.graphics import renderPS
 import tempfile
 
+from app.core.theme import PLOT_COLORS, LIGHT, DARK
+
 _LEGEND_PX_PER_ENTRY = 35
 
 
 class PlotViewer(QWidget):
+    # Shared across all viewers; set by MainWindow when the theme changes.
+    dark_mode: bool = False
+
     def __init__(self, figure=None):
         super().__init__()
         self.figure = figure
@@ -45,15 +51,35 @@ class PlotViewer(QWidget):
             self.html_path = file_path
             local_url = QUrl.fromLocalFile(os.path.abspath(file_path))
             self.browser.load(local_url)
-            if self.default_scale:
-                self.browser.loadFinished.connect(self._apply_default_scale)
+            self.browser.loadFinished.connect(self._on_loaded)
         else:
             print(f"Error: File not found at {file_path}")
 
-    def _apply_default_scale(self, ok: bool):
-        self.browser.loadFinished.disconnect(self._apply_default_scale)
-        if ok and self.default_scale:
+    def _on_loaded(self, ok: bool):
+        self.browser.loadFinished.disconnect(self._on_loaded)
+        if not ok:
+            return
+        if self.default_scale:
             self.set_scale(self.default_scale)
+        self.apply_plot_theme(PlotViewer.dark_mode)
+
+    def apply_plot_theme(self, dark: bool):
+        """Restyle the loaded Plotly figure to match the light/dark theme."""
+        c = PLOT_COLORS[DARK if dark else LIGHT]
+        self.browser.page().setBackgroundColor(QColor(c["paper_bgcolor"]))
+        js = f"""
+        var divs = document.querySelectorAll('.plotly-graph-div');
+        if (divs.length > 0) {{
+            Plotly.relayout(divs[0], {{
+                'paper_bgcolor': '{c["paper_bgcolor"]}',
+                'plot_bgcolor': '{c["plot_bgcolor"]}',
+                'font.color': '{c["font_color"]}',
+                'xaxis.gridcolor': '{c["grid_color"]}',
+                'yaxis.gridcolor': '{c["grid_color"]}'
+            }});
+        }}
+        """
+        self.browser.page().runJavaScript(js)
 
     def set_scale(self, scale_type: str):
         if self.figure is not None:

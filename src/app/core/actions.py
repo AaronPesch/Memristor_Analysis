@@ -31,6 +31,9 @@ class MenuAction(Enum):
     # EXIT
     EXIT = ("Exit", "Ctrl+Q", False)
 
+    # VIEW MENU
+    TOGGLE_DARK_MODE = ("Dark Mode", None, True)
+
     # HELP MENU
     VIEW_HELP = ("View Help", "F1", False)
 

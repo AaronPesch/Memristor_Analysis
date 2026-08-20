@@ -10,6 +10,8 @@ if not getattr(sys, "frozen", False) and __package__ is None:
 import argparse  # noqa: E402
 import PySide6.QtWidgets as qt  # noqa: E402
 from app.ui import MainWindow  # noqa: E402
+from app.core.theme import apply_qt_theme  # noqa: E402
+from app.core.preferences import get_theme  # noqa: E402
 
 
 def main():
@@ -20,7 +22,7 @@ def main():
     args, unknown = parser.parse_known_args()
 
     app = qt.QApplication(sys.argv)
-    app.setStyle("Fusion")
+    apply_qt_theme(app, get_theme())
 
     window = MainWindow()
     window.show()

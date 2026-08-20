@@ -21,7 +21,12 @@ class MenuBar(qt.QMenuBar):
             self.menu_actions[action] = menu_action
 
         self.setup_file_menu()
+        self.setup_view_menu()
         self.setup_help_menu()
+
+    def setup_view_menu(self):
+        self.view_menu = self.addMenu("View")
+        self.view_menu.addAction(self.menu_actions[MenuAction.TOGGLE_DARK_MODE])
 
     def setup_file_menu(self):
         self.file_menu = self.addMenu("File")

@@ -13,10 +13,20 @@ from reportlab.pdfgen import canvas as rl_canvas
 
 from ..converter import BatchConverter, path_to_glob
 from ..core import MenuAction, Mode
-from ..core.preferences import get_scale, set_scale as save_scale_pref
+from ..core.preferences import (
+    get_scale,
+    set_scale as save_scale_pref,
+    get_theme,
+    set_theme,
+    get_window,
+    set_window,
+    set_session,
+)
+from ..core.theme import apply_qt_theme, LIGHT, DARK
 from .import_worker import ImportWorker
 from .menu_bar import MenuBar
 from .navigation_bar import NavigationBar
+from .plot_viewer import PlotViewer
 
 
 class MainWindow(qt.QMainWindow):
@@ -26,6 +36,9 @@ class MainWindow(qt.QMainWindow):
         self.resize(1200, 800)
         self.setup_ui()
         self.setup_connections()
+        self._restore_geometry()
+        # Reflect the theme loaded at startup in the plots + menu check state
+        PlotViewer.dark_mode = get_theme() == DARK
 
     def setup_ui(self) -> None:
         self.menu_bar = MenuBar(self)
@@ -52,6 +65,9 @@ class MainWindow(qt.QMainWindow):
         self.nav_bar = NavigationBar()
         self.main_layout.addWidget(self.nav_bar)
 
+        self.status = self.statusBar()
+        self.status.showMessage("Ready")
+
     def setup_connections(self):
         menu_actions = self.menu_bar.menu_actions
 
@@ -61,6 +77,14 @@ class MainWindow(qt.QMainWindow):
         self.btn_log.clicked.connect(lambda: self._apply_scale("log"))
         self.btn_linear.clicked.connect(lambda: self._apply_scale("linear"))
         self.nav_bar.currentChanged.connect(self._sync_scale_buttons)
+
+        # Dark mode toggle
+        dark_action = menu_actions[MenuAction.TOGGLE_DARK_MODE]
+        dark_action.setChecked(get_theme() == DARK)
+        dark_action.toggled.connect(self.toggle_theme)
+
+        # Status bar: reflect the current tab
+        self.nav_bar.currentChanged.connect(self._update_status_tab)
 
         # Connect Imports (Shortcuts and Menu)
         menu_actions[MenuAction.IMPORT_DEVICE].triggered.connect(
@@ -136,6 +160,44 @@ class MainWindow(qt.QMainWindow):
 
         # Link to GH-Wiki
         menu_actions[MenuAction.VIEW_HELP].triggered.connect(self.open_wiki)
+
+    # ── Theme ────────────────────────────────────────────────────────────
+    def toggle_theme(self, checked: bool):
+        theme = DARK if checked else LIGHT
+        apply_qt_theme(qt.QApplication.instance(), theme)
+        PlotViewer.dark_mode = checked
+        for viewer in self.nav_bar.get_all_viewers():
+            viewer.apply_plot_theme(checked)
+        set_theme(theme)
+
+    # ── Status bar ───────────────────────────────────────────────────────
+    def _update_status_tab(self):
+        text = self.nav_bar.tabText(self.nav_bar.currentIndex())
+        if text:
+            self.status.showMessage(text)
+
+    # ── Window geometry ──────────────────────────────────────────────────
+    def _restore_geometry(self):
+        geom = get_window()
+        if geom:
+            self.move(geom["x"], geom["y"])
+            self.resize(geom["width"], geom["height"])
+
+    def closeEvent(self, event):
+        set_window(self.x(), self.y(), self.width(), self.height())
+        outer = self.nav_bar.currentIndex()
+        inner_widget = self.nav_bar.widget(outer)
+        sub = (
+            inner_widget.currentIndex()
+            if isinstance(inner_widget, qt.QTabWidget)
+            else 0
+        )
+        set_session(
+            getattr(self.nav_bar, "current_level", None),
+            outer,
+            sub,
+        )
+        super().closeEvent(event)
 
     def _is_scale_applicable(self, viewer) -> bool:
         if not viewer or not viewer.html_path:
@@ -358,6 +420,8 @@ class MainWindow(qt.QMainWindow):
         self.import_thread.started.connect(self.worker.run)
         self.worker.progress.connect(self.pd.setValue)
         self.worker.status_message.connect(self.pd.setLabelText)
+        self.worker.status_message.connect(self.status.showMessage)
+        self._import_mode = mode
 
         # Clean up thread when finished
         self.worker.finished.connect(self.import_thread.quit)
@@ -373,9 +437,13 @@ class MainWindow(qt.QMainWindow):
 
     def on_import_success(self):
         self.pd.close()
-        self.nav_bar.update_tabs_by_level()
+        mode = getattr(self, "_import_mode", None)
+        self.nav_bar.update_tabs_by_level(mode.value if mode else None)
         self._connect_inner_tab_signals()
         self._sync_scale_buttons()
+        self.status.showMessage(
+            f"Imported {mode.value} data" if mode else "Import complete"
+        )
         qt.QMessageBox.information(
             self, "Success", "Data imported and plots generated successfully."
         )

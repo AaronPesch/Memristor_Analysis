@@ -6,7 +6,7 @@ from PySide6.QtCore import Qt
 from .plot_viewer import PlotViewer
 from app.core.paths import TEMP_DIR
 from app.core.modes import Mode
-from app.core.preferences import get_scale
+from app.core.preferences import get_scale, get_session
 
 
 class NavigationBar(qt.QTabWidget):
@@ -94,9 +94,15 @@ class NavigationBar(qt.QTabWidget):
         """
         self.clear()
 
-        # Fallback to environment variable if no text is provided
+        # Fallback to the last-used mode, then the environment variable
         if level_text is None:
-            level_text = os.environ.get("MEMRISTOR_MODE", Mode.DEVICE.value)
+            session = get_session()
+            saved_mode = session.get("mode") if session else None
+            level_text = saved_mode or os.environ.get(
+                "MEMRISTOR_MODE", Mode.DEVICE.value
+            )
+
+        self.current_level = level_text
 
         param_labels = {
             "V_set": "V Set",
@@ -172,6 +178,14 @@ class NavigationBar(qt.QTabWidget):
                 "NORM_COND": "Normalized conductance",
                 "butterfly_curve": "Butterfly",
             }
+            spatial_labels = {
+                "spatial_VSET": "V Set",
+                "spatial_V_reset": "V Reset",
+                "spatial_R_HRS": "R HRS",
+                "spatial_R_LRS": "R LRS",
+                "spatial_Memory_window": "Memory Window",
+                "spatial_I_reset_max": "I Reset Max",
+            }
 
             self.addTab(
                 self._create_nested_tab(base_dir, "boxplots_stack_level", param_labels),
@@ -200,6 +214,28 @@ class NavigationBar(qt.QTabWidget):
                 ),
                 "Corr. Matrix",
             )
+
+            self.addTab(
+                self._create_nested_tab(
+                    base_dir, "spatial_maps_stack_level", spatial_labels
+                ),
+                "Stack Map",
+            )
+
+        # Restore the last-open tab (and sub-tab) if it belongs to this level
+        session = get_session()
+        if session and session.get("mode") == level_text:
+            idx = session.get("tab_index", 0)
+            if isinstance(idx, int) and 0 <= idx < self.count():
+                self.setCurrentIndex(idx)
+                sub_idx = session.get("sub_tab_index", 0)
+                inner = self.widget(idx)
+                if (
+                    isinstance(inner, qt.QTabWidget)
+                    and isinstance(sub_idx, int)
+                    and 0 <= sub_idx < inner.count()
+                ):
+                    inner.setCurrentIndex(sub_idx)
 
     def _discover_labels(self, folder: Path) -> dict:
         """Auto-discover HTML files in a folder and build a labels map."""

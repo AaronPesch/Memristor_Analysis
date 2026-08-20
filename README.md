@@ -30,6 +30,8 @@ A Python GUI for the analysis and visualization of Memristor(RRAM) I–V charact
 **General**
 - Cross-platform (Windows/macOS/Linux); results cached in the user's app-data folder
 - Built-in link to the project wiki (Help menu / F1)
+- Dark-mode toggle
+- Session memory when closing the application 
 
 To set up the needed dependencies run the following commands:
 1. pip install virtualenv (if not already installed)

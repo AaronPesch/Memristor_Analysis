@@ -33,6 +33,7 @@ def build_stack_level_correlation_figs(
         ("V_reset", "R_LRS", "V_reset (V) vs R_LRS (Ω)"),
         ("V_reset", "I_reset_max", "V_reset (V) vs I_reset_max (A)"),
         ("V_set", "V_reset", "V_set (V) vs V_reset (V)"),
+        ("R_HRS", "R_LRS", "R_HRS (Ω) vs R_LRS (Ω)"),
     ]
 
     def get_scale(col_name):

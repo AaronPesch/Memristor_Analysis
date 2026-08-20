@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from .utils import gradient_colors, has_valid_data, find_device_sets
+from .fig_boxplots import combined_box_fig
 
 
 def build_stack_level_boxplots(
@@ -190,5 +191,45 @@ def build_stack_level_boxplots(
             )
 
         figures.append(fig)
+
+    # Combined comparison figures (per-device, filterable legend)
+    group_dfs = [
+        (
+            device,
+            box_table[
+                box_table["source_file"].isin(
+                    find_device_sets(box_table, device, stack_id=stack_id)
+                )
+            ],
+        )
+        for device in devices
+    ]
+    meta_extra = {"level": "stack", "stack_id": stack_id}
+    if {"VSET", "V_reset"}.issubset(box_table.columns):
+        figures.append(
+            combined_box_fig(
+                group_dfs,
+                box_table,
+                color_map,
+                [("VSET", "V_set"), ("V_reset", "V_reset")],
+                "V_set_vs_V_reset",
+                f"Stack {stack_id} – Boxplot |V_set| vs |V_reset|",
+                is_log=False,
+                meta_extra=meta_extra,
+            )
+        )
+    if {"R_HRS", "R_LRS"}.issubset(box_table.columns):
+        figures.append(
+            combined_box_fig(
+                group_dfs,
+                box_table,
+                color_map,
+                [("R_HRS", "R_HRS"), ("R_LRS", "R_LRS")],
+                "R_HRS_vs_R_LRS",
+                f"Stack {stack_id} – Boxplot |R_HRS| vs |R_LRS| (Log Scale)",
+                is_log=True,
+                meta_extra=meta_extra,
+            )
+        )
 
     return figures

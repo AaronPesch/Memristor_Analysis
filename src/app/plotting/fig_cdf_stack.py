@@ -1,7 +1,7 @@
 from __future__ import annotations
 import pandas as pd
 import plotly.graph_objects as go
-from .fig_cdf import _cdf_xy
+from .fig_cdf import _cdf_xy, combined_cdf_fig
 from .utils import gradient_colors, has_valid_data, find_device_sets, log_axis_config
 
 
@@ -164,5 +164,47 @@ def build_stack_level_cdf_figs(
             )
 
         figures.append(fig)
+
+    # Combined comparison figures (per-device, filterable legend)
+    group_dfs = [
+        (
+            device,
+            cdf_table[
+                cdf_table["source_file"].isin(
+                    find_device_sets(cdf_table, device, stack_id=stack_id)
+                )
+            ],
+        )
+        for device in devices
+    ]
+    meta_extra = {"level": "stack", "stack_id": stack_id}
+    if {"VSET", "V_reset"}.issubset(cdf_table.columns):
+        figures.append(
+            combined_cdf_fig(
+                group_dfs,
+                cdf_table,
+                color_map,
+                [("VSET", "V_set", None), ("V_reset", "V_reset", "dot")],
+                "V_set_vs_V_reset",
+                f"Stack {stack_id} – CDF |V_set| vs |V_reset|",
+                "|Voltage| (V)",
+                is_log=False,
+                meta_extra=meta_extra,
+            )
+        )
+    if {"R_HRS", "R_LRS"}.issubset(cdf_table.columns):
+        figures.append(
+            combined_cdf_fig(
+                group_dfs,
+                cdf_table,
+                color_map,
+                [("R_HRS", "R_HRS", None), ("R_LRS", "R_LRS", "dot")],
+                "R_HRS_vs_R_LRS",
+                f"Stack {stack_id} – CDF |R_HRS| vs |R_LRS| (Log Scale)",
+                "|Resistance| (Ω)",
+                is_log=True,
+                meta_extra=meta_extra,
+            )
+        )
 
     return figures

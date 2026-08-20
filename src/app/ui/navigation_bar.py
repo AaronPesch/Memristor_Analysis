@@ -111,6 +111,8 @@ class NavigationBar(qt.QTabWidget):
             "V_forming": "V Forming",
             "I_leakage_pristine": "I Leakage Pristine",
             "R_pristine": "R Pristine",
+            "V_set_vs_V_reset": "V Set vs V Reset",
+            "R_HRS_vs_R_LRS": "R HRS vs R LRS",
         }
 
         corr_labels = {
@@ -120,6 +122,7 @@ class NavigationBar(qt.QTabWidget):
             "V_reset_vs_R_LRS": "Vreset vs RLRS",
             "V_reset_vs_I_reset_max": "Vreset vs Ireset",
             "V_set_vs_V_reset": "Vset vs Vreset",
+            "R_HRS_vs_R_LRS": "RHRS vs RLRS",
             "V_forming_vs_first_V_reset": "Forming vs 1st Reset",
             "I_leakage_pristine_vs_V_forming": "Leakage vs Forming",
             "R_pristine_vs_V_forming": "R Pristine vs Forming",

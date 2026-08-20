@@ -4,6 +4,122 @@ import pandas as pd
 import plotly.graph_objects as go
 from .utils import gradient_colors, has_valid_data
 
+_TICK_VALS = [10.0**i for i in range(-15, 16)]
+_TICK_TEXT = [f"1e{i}" if i != 0 else "1" for i in range(-15, 16)]
+
+
+def combined_box_fig(
+    group_dfs: list[tuple[str, "pd.DataFrame"]],
+    all_df: "pd.DataFrame",
+    color_map: dict,
+    specs: list[tuple[str, str]],
+    param_id: str,
+    title: str,
+    is_log: bool,
+    meta_extra: dict | None = None,
+) -> go.Figure:
+    """Combined boxplot: two parameters (specs) side-by-side, one box per group.
+
+    Each group (device/set) is a single trace spanning both x-categories so that
+    boxmode='group' places every group's box side-by-side under each category.
+    All values are taken as absolute; log params also drop non-positive values.
+    """
+    fig = go.Figure()
+    all_vals: list[float] = []
+
+    def _series(sub, col):
+        v = pd.to_numeric(sub[col], errors="coerce").dropna().abs()
+        return v[v > 0] if is_log else v
+
+    for name, sub in group_dfs:
+        xs, ys = [], []
+        for col, cat in specs:
+            v = _series(sub, col)
+            ys.extend(v.tolist())
+            xs.extend([cat] * len(v))
+        if ys:
+            all_vals.extend(ys)
+        fig.add_trace(
+            go.Box(
+                y=ys,
+                x=xs,
+                name=name,
+                marker_color=color_map.get(name),
+                fillcolor=color_map.get(name),
+                line=dict(width=2),
+                opacity=0.7,
+                boxpoints=False,
+                legendgroup=name,
+            )
+        )
+
+    # Unified "All Data" across every group
+    xs, ys = [], []
+    for col, cat in specs:
+        v = _series(all_df, col)
+        ys.extend(v.tolist())
+        xs.extend([cat] * len(v))
+    if ys:
+        all_vals.extend(ys)
+        fig.add_trace(
+            go.Box(
+                y=ys,
+                x=xs,
+                name="All Data (unified)",
+                marker_color="black",
+                line=dict(width=2.5, color="black"),
+                fillcolor="rgba(0,0,0,0.15)",
+                boxpoints=False,
+                legendgroup="unified",
+            )
+        )
+
+    if is_log:
+        fig.update_yaxes(
+            type="log",
+            tickmode="array",
+            tickvals=_TICK_VALS,
+            ticktext=_TICK_TEXT,
+            exponentformat="power",
+            showgrid=True,
+            gridcolor="#E5E5E5",
+            minor=dict(showgrid=False),
+            zeroline=False,
+            autorange=True,
+        )
+    else:
+        fig.update_yaxes(
+            type="linear",
+            autorange=True,
+            showgrid=True,
+            gridcolor="#E5E5E5",
+            zeroline=True,
+            zerolinecolor="gray",
+        )
+
+    fig.update_xaxes(showgrid=True, gridcolor="#E5E5E5")
+    fig.update_layout(
+        title=title,
+        width=900,
+        height=600,
+        template="plotly_white",
+        showlegend=True,
+        boxmode="group",
+        meta={"param_id": param_id, **(meta_extra or {})},
+    )
+
+    if not all_vals:
+        fig.add_annotation(
+            text="No valid data found",
+            xref="paper",
+            yref="paper",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+        )
+
+    return fig
+
 
 def build_boxplots_figs(box_table: "pd.DataFrame", sets: list[str]) -> list[go.Figure]:
     """
@@ -160,5 +276,32 @@ def build_boxplots_figs(box_table: "pd.DataFrame", sets: list[str]) -> list[go.F
             )
 
         figures.append(fig)
+
+    # Combined comparison figures (per-set, filterable legend)
+    group_dfs = [(s, box_table[box_table["source_file"] == s]) for s in sets]
+    if {"VSET", "V_reset"}.issubset(box_table.columns):
+        figures.append(
+            combined_box_fig(
+                group_dfs,
+                box_table,
+                color_map,
+                [("VSET", "V_set"), ("V_reset", "V_reset")],
+                "V_set_vs_V_reset",
+                "Boxplot – |V_set| vs |V_reset|",
+                is_log=False,
+            )
+        )
+    if {"R_HRS", "R_LRS"}.issubset(box_table.columns):
+        figures.append(
+            combined_box_fig(
+                group_dfs,
+                box_table,
+                color_map,
+                [("R_HRS", "R_HRS"), ("R_LRS", "R_LRS")],
+                "R_HRS_vs_R_LRS",
+                "Boxplot – |R_HRS| vs |R_LRS| (Log Scale)",
+                is_log=True,
+            )
+        )
 
     return figures

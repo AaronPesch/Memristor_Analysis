@@ -13,6 +13,7 @@ from .fig_boxplots_stack import build_stack_level_boxplots
 from .fig_cdf_stack import build_stack_level_cdf_figs
 from .fig_correlation_matrix import build_correlation_matrix_figs
 from .fig_correlation_matrix_stack import build_stack_level_correlation_matrix_figs
+from .fig_spatial_map_stack import build_stack_level_spatial_maps
 from app.core.modes import Mode
 
 
@@ -201,6 +202,23 @@ def plot_stack(
             _write_json(fig, stack_matrix_dir / f"{pid}.json")
 
     write_correlation_matrix_figs()
+
+    # Spatial stack map
+    def write_stack_level_spatial_maps():
+        spatial_dir = cfg.output_dir / "spatial_maps_stack_level"
+        spatial_dir.mkdir(parents=True, exist_ok=True)
+
+        spatial_figs = build_stack_level_spatial_maps(
+            box_table=data.box_table,
+            stack_id=stack_id,
+            devices=devices,
+        )
+        for fig in spatial_figs:
+            pid = fig.layout.meta.get("param_id")
+            _write(fig, spatial_dir / f"{pid}.html")
+            _write_json(fig, spatial_dir / f"{pid}.json")
+
+    write_stack_level_spatial_maps()
 
 
 def main() -> None:

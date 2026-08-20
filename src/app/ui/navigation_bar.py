@@ -172,6 +172,14 @@ class NavigationBar(qt.QTabWidget):
                 "NORM_COND": "Normalized conductance",
                 "butterfly_curve": "Butterfly",
             }
+            spatial_labels = {
+                "spatial_VSET": "V Set",
+                "spatial_V_reset": "V Reset",
+                "spatial_R_HRS": "R HRS",
+                "spatial_R_LRS": "R LRS",
+                "spatial_Memory_window": "Memory Window",
+                "spatial_I_reset_max": "I Reset Max",
+            }
 
             self.addTab(
                 self._create_nested_tab(base_dir, "boxplots_stack_level", param_labels),
@@ -199,6 +207,13 @@ class NavigationBar(qt.QTabWidget):
                     ),
                 ),
                 "Corr. Matrix",
+            )
+
+            self.addTab(
+                self._create_nested_tab(
+                    base_dir, "spatial_maps_stack_level", spatial_labels
+                ),
+                "Stack Map",
             )
 
     def _discover_labels(self, folder: Path) -> dict:

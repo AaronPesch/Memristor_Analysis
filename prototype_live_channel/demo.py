@@ -23,8 +23,15 @@ from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineCore import QWebEngineSettings
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import (
-    QApplication, QCheckBox, QComboBox, QHBoxLayout, QLabel,
-    QMainWindow, QPushButton, QVBoxLayout, QWidget,
+    QApplication,
+    QCheckBox,
+    QComboBox,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
 )
 
 import plotly
@@ -148,7 +155,9 @@ class MainWindow(QMainWindow):
 
         self.view = QWebEngineView()
         settings = self.view.settings()
-        settings.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls, True)
+        settings.setAttribute(
+            QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls, True
+        )
 
         channel = QWebChannel(self.view.page())
         channel.registerObject("bridge", self.bridge)
@@ -189,7 +198,11 @@ class MainWindow(QMainWindow):
         bar.addWidget(reset)
 
         bar.addStretch(1)
-        bar.addWidget(QLabel("Tip: zoom into a plot, then toggle log or dark - the zoom survives."))
+        bar.addWidget(
+            QLabel(
+                "Tip: zoom into a plot, then toggle log or dark - the zoom survives."
+            )
+        )
         return bar
 
     # Every handler is the same three lines: change state, re-query, push.

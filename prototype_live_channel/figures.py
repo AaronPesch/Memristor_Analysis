@@ -23,10 +23,15 @@ THEME = {
 
 def _positive(*arrays) -> bool:
     """A log axis is only meaningful if every value is > 0. V_reset is not."""
-    return all(a.size == 0 or float(np.min(a)) > 0 for a in (np.asarray(x, dtype=float) for x in arrays))
+    return all(
+        a.size == 0 or float(np.min(a)) > 0
+        for a in (np.asarray(x, dtype=float) for x in arrays)
+    )
 
 
-def _style(fig: go.Figure, dark: bool, title: str, log_y: bool, *, log_x: bool = False) -> go.Figure:
+def _style(
+    fig: go.Figure, dark: bool, title: str, log_y: bool, *, log_x: bool = False
+) -> go.Figure:
     """Apply theme + the uirevision keys that make Plotly.react non-destructive.
 
     uirevision is the mechanism that keeps the user's zoom, pan and legend state
@@ -87,14 +92,18 @@ def spatial_map(rows, selected: set[str], param: str, dark: bool) -> go.Figure:
                 color=color,
                 colorscale="Viridis",
                 showscale=True,
-                colorbar=dict(title=dict(text=cbar_label, font=dict(size=10)), thickness=12),
+                colorbar=dict(
+                    title=dict(text=cbar_label, font=dict(size=10)), thickness=12
+                ),
                 line=dict(
                     width=[3 if i in selected else 0 for i in ids],
                     color=ACCENT,
                 ),
             ),
             customdata=ids,
-            hovertemplate="%{customdata}<br>" + cbar_label.replace("<br>", " ") + ": %{marker.color:.3g}<extra></extra>",
+            hovertemplate="%{customdata}<br>"
+            + cbar_label.replace("<br>", " ")
+            + ": %{marker.color:.3g}<extra></extra>",
         )
     )
     fig.update_layout(dragmode="select")
@@ -116,14 +125,18 @@ def correlation(rows, selected: set[str], dark: bool) -> go.Figure:
     if selected and (~mask).any():
         fig.add_trace(
             go.Scattergl(
-                x=xs[~mask], y=ys[~mask], mode="markers",
+                x=xs[~mask],
+                y=ys[~mask],
+                mode="markers",
                 marker=dict(size=4, color=muted, opacity=0.45),
                 hoverinfo="skip",
             )
         )
     fig.add_trace(
         go.Scattergl(
-            x=xs[mask], y=ys[mask], mode="markers",
+            x=xs[mask],
+            y=ys[mask],
+            mode="markers",
             marker=dict(size=5, color=ACCENT, opacity=0.75),
             customdata=dev[mask],
             hovertemplate="%{customdata}<br>|V_set| %{x:.2f} V<br>|V_reset| %{y:.2f} V<extra></extra>",
@@ -135,7 +148,9 @@ def correlation(rows, selected: set[str], dark: bool) -> go.Figure:
     return _style(fig, dark, "Correlation - lasso to filter", log_y=False)
 
 
-def cdf(all_vals: np.ndarray, sel_vals: np.ndarray, param: str, dark: bool, log_x: bool) -> go.Figure:
+def cdf(
+    all_vals: np.ndarray, sel_vals: np.ndarray, param: str, dark: bool, log_x: bool
+) -> go.Figure:
     """Selection against the full stack, so the effect of a filter is obvious."""
     label, unit, _ = PARAMS[param]
     log_x = log_x and _positive(all_vals, sel_vals)
@@ -149,7 +164,10 @@ def cdf(all_vals: np.ndarray, sel_vals: np.ndarray, param: str, dark: bool, log_
         p = np.arange(1, v.size + 1) / v.size * 100
         fig.add_trace(
             go.Scattergl(
-                x=v, y=p, mode="lines", name=name,
+                x=v,
+                y=p,
+                mode="lines",
+                name=name,
                 line=dict(color=color, width=width),
                 hovertemplate=name + "<br>%{x:.3g}<br>%{y:.1f} %<extra></extra>",
             )
@@ -173,10 +191,25 @@ def endurance(rows, param: str, dark: bool, log_y: bool) -> go.Figure:
 
     band = "rgba(76,141,255,0.18)"
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=cyc + cyc[::-1], y=hi + lo[::-1], fill="toself",
-                             fillcolor=band, line=dict(width=0), hoverinfo="skip"))
-    fig.add_trace(go.Scattergl(x=cyc, y=mean, mode="lines", line=dict(color=ACCENT, width=2),
-                               hovertemplate="Cycle %{x}<br>%{y:.3g}<extra></extra>"))
+    fig.add_trace(
+        go.Scatter(
+            x=cyc + cyc[::-1],
+            y=hi + lo[::-1],
+            fill="toself",
+            fillcolor=band,
+            line=dict(width=0),
+            hoverinfo="skip",
+        )
+    )
+    fig.add_trace(
+        go.Scattergl(
+            x=cyc,
+            y=mean,
+            mode="lines",
+            line=dict(color=ACCENT, width=2),
+            hovertemplate="Cycle %{x}<br>%{y:.3g}<extra></extra>",
+        )
+    )
     fig.update_xaxes(title="Cycle", rangeslider=dict(visible=True, thickness=0.10))
     fig.update_yaxes(title=f"{label} [{unit}]")
     return _style(fig, dark, f"Endurance - {label} (drag the slider)", log_y=log_y)

@@ -37,7 +37,17 @@ def build_connection(seed: int = 7) -> duckdb.DuckDBPyConnection:
     rng = np.random.default_rng(seed)
     cyc = np.arange(1, N_CYCLES + 1)
     chunks: dict[str, list[np.ndarray]] = {
-        k: [] for k in ("device", "drow", "dcol", "cycle", "v_set", "v_reset", "r_lrs", "r_hrs")
+        k: []
+        for k in (
+            "device",
+            "drow",
+            "dcol",
+            "cycle",
+            "v_set",
+            "v_reset",
+            "r_lrs",
+            "r_hrs",
+        )
     }
 
     for r in range(ROWS):
@@ -130,7 +140,9 @@ class Store:
             args,
         )
 
-    def values(self, param: str, devices: list[str], cycles: tuple[int, int]) -> np.ndarray:
+    def values(
+        self, param: str, devices: list[str], cycles: tuple[int, int]
+    ) -> np.ndarray:
         """Flat parameter values, optionally restricted to a device selection."""
         where, args = self._cycle_clause(cycles)
         if devices:

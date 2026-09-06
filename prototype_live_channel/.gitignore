@@ -1,8 +1,8 @@
-# Copied here at startup by demo.py, out of the plotly and Qt packages.
+# Copied here at startup by analysis_app.py, out of the plotly and Qt packages.
 web/plotly.min.js
 web/qwebchannel.js
 __pycache__/
 
 # The repo root ignores *.html, because the old pipeline generated them by the
-# dozen. This one is hand-written source, not output.
-!web/index.html
+# dozen. The pages in web/ are hand-written source, not output.
+!web/*.html

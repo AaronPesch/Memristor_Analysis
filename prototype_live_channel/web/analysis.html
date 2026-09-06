@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Memristor Analysis</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: transparent;
+                 font-family: system-ui, sans-serif; overflow: hidden; }
+    #plot { width: 100%; height: 100%; }
+    #placeholder { position: absolute; inset: 0; display: flex; align-items: center;
+                   justify-content: center; color: #888; font-size: 15px;
+                   text-align: center; padding: 0 40px; line-height: 1.6; }
+  </style>
+  <!-- Copied here at startup from the installed plotly and Qt packages.
+       Loaded once for the whole session; nothing comes from the network. -->
+  <script src="plotly.min.js"></script>
+  <script src="qwebchannel.js"></script>
+</head>
+<body>
+  <div id="placeholder">Connecting…</div>
+  <div id="plot"></div>
+  <script src="analysis.js"></script>
+</body>
+</html>

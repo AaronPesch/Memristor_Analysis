@@ -1,4 +1,20 @@
+# GUI + live channel
 PySide6>=6.6
-duckdb>=1.0
-numpy>=1.26
 plotly>=6.0
+numpy>=1.26
+
+# Import pipeline (same stack as the main application)
+duckdb>=1.0
+polars>=1.0
+fastexcel>=0.19
+pandas>=2.0
+pyarrow>=15.0
+
+# Export
+kaleido>=1.0
+reportlab>=4.0
+svglib>=1.5
+python-pptx>=1.0
+
+# tools/make_fixtures.py only
+XlsxWriter>=3.2

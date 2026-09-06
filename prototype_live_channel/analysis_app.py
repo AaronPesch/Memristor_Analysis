@@ -20,7 +20,7 @@ HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "src"))
 
-from PySide6.QtCore import QThread, QUrl, Qt  # noqa: E402
+from PySide6.QtCore import QThread, QUrl, Qt, Slot  # noqa: E402
 from PySide6.QtGui import QAction, QDesktopServices, QKeySequence  # noqa: E402
 from PySide6.QtWebChannel import QWebChannel  # noqa: E402
 from PySide6.QtWebEngineCore import QWebEngineSettings  # noqa: E402
@@ -70,6 +70,7 @@ class AnalysisWindow(QMainWindow):
         self.dark = preferences.get_theme() == "dark"
         self.thread: QThread | None = None
         self.worker: channel.ImportWorker | None = None
+        self._pending_mode: Mode | None = None
         self._loading = False
 
         self._build_menus()
@@ -269,19 +270,21 @@ class AnalysisWindow(QMainWindow):
 
     # ---- import -------------------------------------------------------------
 
-    def start_import(self, mode: Mode) -> None:
+    def start_import(self, mode: Mode, folder: str | None = None) -> None:
         if self._loading:
             return
-        caption = (
-            "Select the DEVICE folder (contains the .xlsx files)"
-            if mode is Mode.DEVICE
-            else "Select the STACK folder (contains the device folders)"
-        )
-        folder = QFileDialog.getExistingDirectory(self, caption)
+        if folder is None:
+            caption = (
+                "Select the DEVICE folder (contains the .xlsx files)"
+                if mode is Mode.DEVICE
+                else "Select the STACK folder (contains the device folders)"
+            )
+            folder = QFileDialog.getExistingDirectory(self, caption)
         if not folder:
             return
 
         self._loading = True
+        self._pending_mode = mode
         self.progress = QProgressDialog("Starting...", None, 0, 100, self)
         self.progress.setWindowTitle("Import")
         self.progress.setWindowModality(Qt.WindowModality.WindowModal)
@@ -295,9 +298,17 @@ class AnalysisWindow(QMainWindow):
         self.worker.progress.connect(self.progress.setValue)
         self.worker.status.connect(self.progress.setLabelText)
         self.worker.status.connect(self.statusBar().showMessage)
-        self.worker.finished.connect(lambda d, c: self.on_import_done(mode, d, c))
+        # Must be a bound method of this QObject, not a lambda: Qt cannot work
+        # out a receiver thread for a plain callable, falls back to a direct
+        # connection, and the handler would then run on the worker thread --
+        # where _stop_thread()'s wait() deadlocks on itself.
+        self.worker.finished.connect(self._on_import_finished)
         self.worker.failed.connect(self.on_import_failed)
         self.thread.start()
+
+    @Slot(object, object)
+    def _on_import_finished(self, data, categories) -> None:
+        self.on_import_done(self._pending_mode, data, categories)
 
     def _stop_thread(self) -> None:
         self._loading = False

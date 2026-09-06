@@ -17,10 +17,21 @@ DuckDB 1.5.5, polars 1.44.1 auf Windows.
 
 ## Starten
 
+Einmalig, im Repo-Wurzelverzeichnis:
+
 ```
-pip install -r requirements.txt
-python analysis_app.py
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -r prototype_live_channel\requirements.txt
 ```
+
+Danach, aus diesem Ordner heraus:
+
+```
+..\.venv\Scripts\python.exe analysis_app.py
+```
+
+Der volle Pfad zum Interpreter spart das Aktivieren des venv; `python
+analysis_app.py` funktioniert nur nach `.venv\Scripts\activate`.
 
 `--smoke-test` baut das Fenster auf und beendet sofort (fuer CI).
 Kein Vendoring-Schritt: `analysis_app.py` kopiert beim Start `plotly.min.js`

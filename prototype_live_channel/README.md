@@ -91,11 +91,24 @@ Den Stack-Ordner dann mit Ctrl+Shift+O importieren.
 - Der Startbildschirm ist ein Hinweistext; die Knoepfe *Continue Device/Stack
   Level Analysis* aus `navigation_bar.py` fehlen. Sie setzen vorhandene
   HTML-Dateien voraus, brauchen hier also ein anderes Kriterium.
-- Getestet ausschliesslich gegen die synthetischen Fixtures. Mit ihnen liefern
-  `V_reset` und `I_reset_max` keine gueltigen Werte pro Device, weshalb Stack
-  Map und Yield Map dafuer je vier statt sechs Metriken zeigen. Das ist eine
-  Schwaeche der Fixtures, kein Fehler im Code — mit echten Messdaten
-  nachpruefen.
+
+## Gegen echte Messdaten geprueft
+
+Stack `T25098`, 272 Dateien: Import 2.072.763 Zeilen in 10,9 s, danach 75
+Stack-Figures (6,2 s) bzw. 129 Device-Figures (18,3 s). 30 Devices, 61
+Endurance-Sets. Export in allen Formaten geprueft.
+
+Zwei Dinge, die dabei auffielen:
+
+- Mit echten Daten zeigen Stack Map und Yield Map alle sechs Metriken. Die
+  synthetischen Fixtures liefern fuer `V_reset` und `I_reset_max` keine
+  gueltigen Werte pro Device und kommen dort nur auf vier — eine Schwaeche der
+  Fixtures, kein Fehler im Code.
+- In T25098 sind die Messdateien **byte-identische Kopien**: pro Messtyp 30
+  Dateien mit nur 4 verschiedenen Inhalten, 26 Devices teilen sich dieselbe
+  `03 endurance set.xlsx`. Stack-Vergleiche ueber diesen Datensatz sind daher
+  gegenstandslos — fuer einen Funktionstest reicht er, fuer eine Auswertung
+  nicht.
 
 ## Dateien
 

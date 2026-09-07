@@ -86,6 +86,35 @@ Den Stack-Ordner dann mit Ctrl+Shift+O importieren.
   *Filter to selection* die Builder auf die Teilmenge neu laufen lassen. Das
   ging vorher prinzipiell nicht — es braucht den Rueckkanal.
 
+## Interaktion im Plot
+
+| Geste | Wirkung |
+|---|---|
+| Klick auf Punkt, Box oder Zelle | Device zur Auswahl hinzufuegen/entfernen — alles andere wird gedimmt |
+| Lasso / Rechteck | mehrere Devices auf einmal auswaehlen |
+| Doppelklick ins Leere | Auswahl aufheben |
+| **Strg+Klick** (bzw. Cmd) | **Drill-down**: die rohe I–V-Kennlinie hinter diesem Punkt |
+| *Filter to selection* | Builder auf die ausgewaehlten Devices einschraenken (rechnet neu) |
+
+Zwei Dinge daran sind bewusst so gebaut:
+
+- **Hervorheben ist kein Neubau.** Das Dimmen wird auf das serialisierte
+  Payload angewandt, nicht auf die Figure. Es kostet ~9 ms statt ~6 s, gilt
+  sofort in jedem Tab, und die gespeicherte Figure bleibt unveraendert — der
+  Export sieht weiterhin genau das, was die Builder erzeugt haben. Aggregat-
+  kurven wie *All Devices (unified)* gehoeren keinem Device und bleiben stehen.
+- **Der Zyklus wird nicht geraten.** Nur Endurance-Plots tragen die Zyklusnummer
+  auf der x-Achse; dort fuehrt Strg+Klick exakt zu diesem Zyklus. Eine CDF
+  sortiert ihre Werte und ein Boxplot gruppiert sie — der Punktindex sagt dort
+  nichts ueber den Zyklus aus. Von dort geht es deshalb auf das Device mit allen
+  seinen Zyklen, statt eine falsche Zuordnung vorzutaeuschen.
+
+Die Seite entscheidet dabei nicht selbst, zu welchem Device ein Punkt gehoert —
+sie schickt nur Trace-Name und Koordinaten, `drilldown.resolve_device()` loest
+auf. Nur die Python-Seite kennt die Device-Liste und die Stack-ID, und
+Quelldateinamen (`<stack_id>_<device>_<NN>_<typ>`) sind im Browser nicht
+zuverlaessig zerlegbar: Stack-IDs duerfen selbst Unterstriche enthalten.
+
 ### Was noch offen ist
 
 - Der Startbildschirm ist ein Hinweistext; die Knoepfe *Continue Device/Stack

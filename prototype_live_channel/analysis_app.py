@@ -43,6 +43,7 @@ from PySide6.QtWidgets import (  # noqa: E402
 )
 
 import channel  # noqa: E402
+import drilldown  # noqa: E402
 import exporters  # noqa: E402
 import fig_yield  # noqa: E402
 import live_pipeline  # noqa: E402
@@ -66,6 +67,8 @@ class AnalysisWindow(QMainWindow):
         self.categories: list[live_pipeline.Category] = []
         self.selection: set[str] = set()
         self.device_filter: list[str] | None = None
+        self.drill: tuple | None = None
+        self._owner_cache: dict[str, list] = {}
         self.mode: Mode | None = None
         self.dark = preferences.get_theme() == "dark"
         self.thread: QThread | None = None
@@ -193,6 +196,10 @@ class AnalysisWindow(QMainWindow):
         self.filter_button.clicked.connect(self.apply_device_filter)
         self.filter_button.setEnabled(False)
         controls.addWidget(self.filter_button)
+        self.back_button = QPushButton("← Back to plot")
+        self.back_button.clicked.connect(self.leave_drill)
+        self.back_button.setVisible(False)
+        controls.addWidget(self.back_button)
         self.clear_button = QPushButton("Show all devices")
         self.clear_button.clicked.connect(self.clear_device_filter)
         self.clear_button.setEnabled(False)
@@ -255,15 +262,71 @@ class AnalysisWindow(QMainWindow):
         return f"{category.key}/{param_id}", category.figures[param_id]
 
     def current_payload(self) -> dict:
+        if self.drill is not None:
+            fig, label = self.drill
+            key = f"drill/{label}"
+            return {
+                "key": key,
+                "figure": channel.figure_payload(fig, key, self.dark, None),
+            }
+
         key, fig = self.current_figure()
         if fig is None:
             return {"figure": None, "message": WELCOME}
+        payload = channel.figure_payload(
+            fig, key, self.dark, preferences.get_scale(key)
+        )
+        # Highlighting is applied to the payload, not the figure: no rebuild, so
+        # it lands instantly and on every tab at once.
         return {
             "key": key,
-            "figure": channel.figure_payload(
-                fig, key, self.dark, preferences.get_scale(key)
+            "figure": drilldown.apply_highlight(
+                payload, self._trace_owners(key, fig), self.selection
             ),
         }
+
+    def _trace_owners(self, key: str, fig) -> list[str | None]:
+        """Which device each trace belongs to, cached per plot."""
+        if self.data is None:
+            return []
+        if key not in self._owner_cache:
+            self._owner_cache[key] = drilldown.trace_devices(
+                fig, self.data.devices, self.data.stack_id
+            )
+        return self._owner_cache[key]
+
+    # ---- point resolution ---------------------------------------------------
+
+    def resolve_device(self, ref: dict) -> str | None:
+        if self.data is None:
+            return None
+        return drilldown.resolve_device(ref, self.data.devices, self.data.stack_id)
+
+    def resolve_devices(self, refs: list[dict]) -> list[str]:
+        seen: list[str] = []
+        for ref in refs:
+            device = self.resolve_device(ref)
+            if device and device not in seen:
+                seen.append(device)
+        return seen
+
+    # ---- drill-down ---------------------------------------------------------
+
+    def drill_to(self, device: str, cycle: int | None) -> None:
+        if self.data is None:
+            return
+        fig, label = drilldown.build_drill_figure(self.data, device, cycle)
+        if fig is None:
+            self.statusBar().showMessage(label)
+            return
+        self.drill = (fig, label)
+        self.back_button.setVisible(True)
+        self.statusBar().showMessage(f"Raw sweep: {label}")
+
+    def leave_drill(self) -> None:
+        self.drill = None
+        self.back_button.setVisible(False)
+        self.push()
 
     def push(self) -> None:
         self.bridge.push()
@@ -325,6 +388,8 @@ class AnalysisWindow(QMainWindow):
         self.mode = mode
         self.data = data
         self.categories = categories
+        self._owner_cache.clear()
+        self.drill = None
         self.selection = set()
         self.device_filter = None
         self.populate_tabs()
@@ -375,6 +440,9 @@ class AnalysisWindow(QMainWindow):
         self.on_subtab_changed(wanted)
 
     def on_subtab_changed(self, _index: int) -> None:
+        # Changing tabs leaves the drill-down view.
+        self.drill = None
+        self.back_button.setVisible(False)
         key, fig = self.current_figure()
         is_yield = bool(self.category and self.category.key.startswith("yield"))
         self.yield_widget.setVisible(is_yield)
@@ -489,6 +557,8 @@ class AnalysisWindow(QMainWindow):
         else:
             self.categories = live_pipeline.build_stack_categories(data)
         self.categories = [c for c in self.categories if c.figures]
+        self._owner_cache.clear()
+        self.drill = None
         self.populate_tabs()
         self.refresh_selection_ui()
         count = len(devices) if devices else len(self.data.devices)

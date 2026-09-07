@@ -97,12 +97,24 @@ class Bridge(QObject):
         """
         request = json.loads(request_json)
         kind = request.get("kind")
+
         if kind == "select_devices":
-            self.window.selection = set(request.get("devices") or [])
+            devices = self.window.resolve_devices(request.get("points") or [])
+            if devices:
+                self.window.selection = set(devices)
         elif kind == "toggle_device":
-            self.window.selection ^= {request["device"]}
+            device = self.window.resolve_device(request.get("point") or {})
+            if device:
+                self.window.selection ^= {device}
         elif kind == "clear_selection":
             self.window.selection = set()
+        elif kind == "drill":
+            # Aggregate point -> the raw sweep behind it.
+            device = self.window.resolve_device(request.get("point") or {})
+            cycle = request.get("cycle")
+            if device:
+                self.window.drill_to(device, int(cycle) if cycle is not None else None)
+
         self.window.refresh_selection_ui()
         return json.dumps(self.window.current_payload())
 

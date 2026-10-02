@@ -136,7 +136,7 @@ class AnalysisWindow(QMainWindow):
         act_pdf = QAction("Combined multi-page PDF", self)
         act_pdf.triggered.connect(self.export_combined_pdf)
         every.addAction(act_pdf)
-        act_pptx = QAction("PowerPoint (related plots paired per slide)", self)
+        act_pptx = QAction("PowerPoint (one plot per slide)", self)
         act_pptx.triggered.connect(self.export_pptx)
         every.addAction(act_pptx)
 

@@ -147,83 +147,8 @@ def write_combined_pdf(figures: list[tuple[str, object]], path: Path) -> int:
     return written
 
 
-# Plots that belong side by side on one slide. Matched on the base parameter
-# name, so the same rule also pairs spatial_VSET with spatial_V_reset and
-# yield_R_HRS with yield_R_LRS -- not just the boxplots.
-SLIDE_PAIRS = (
-    ("VSET", "V_reset"),
-    ("V_set", "V_reset"),
-    ("R_LRS", "R_HRS"),
-    ("I_LRS", "I_HRS"),
-)
-PAIR_PREFIXES = ("spatial_", "yield_")
-GUTTER_FRACTION = 0.02
-
-
-def _split_prefix(param_id: str) -> tuple[str, str]:
-    for prefix in PAIR_PREFIXES:
-        if param_id.startswith(prefix):
-            return prefix, param_id[len(prefix) :]
-    return "", param_id
-
-
-def _partner_of(param_id: str) -> str | None:
-    """The plot this one shares a slide with, if any."""
-    prefix, base = _split_prefix(param_id)
-    for left, right in SLIDE_PAIRS:
-        if base == left:
-            return prefix + right
-        if base == right:
-            return prefix + left
-    return None
-
-
-def plan_slides(figures: list[tuple[str, object]]) -> list[list[tuple[str, object]]]:
-    """Group the figures into slides of one or two plots.
-
-    V_set and V_reset of the same plot type go together, as do R_LRS/R_HRS and
-    I_LRS/I_HRS; everything else gets its own slide. Pairing never crosses a
-    category -- the V_reset boxplot pairs with the V_set boxplot, not with a
-    V_set CDF -- and document order is preserved, so the first of a pair stays
-    on the left.
-
-    The combined plots (V_set_vs_V_reset, R_HRS_vs_R_LRS) already show both
-    curves in one figure, so they stay on their own slide.
-    """
-    by_category: dict[str, list[tuple[str, str, object]]] = {}
-    order: list[str] = []
-    for name, fig in figures:
-        category, _, param_id = name.partition("__")
-        if category not in by_category:
-            by_category[category] = []
-            order.append(category)
-        by_category[category].append((param_id, name, fig))
-
-    slides: list[list[tuple[str, object]]] = []
-    for category in order:
-        items = by_category[category]
-        available = {param_id: i for i, (param_id, _, _) in enumerate(items)}
-        used: set[int] = set()
-        for index, (param_id, name, fig) in enumerate(items):
-            if index in used:
-                continue
-            used.add(index)
-            partner = _partner_of(param_id)
-            partner_index = available.get(partner) if partner else None
-            if partner_index is not None and partner_index not in used:
-                used.add(partner_index)
-                p_param, p_name, p_fig = items[partner_index]
-                slides.append([(name, fig), (p_name, p_fig)])
-            else:
-                slides.append([(name, fig)])
-    return slides
-
-
 def write_pptx(figures: list[tuple[str, object]], path: Path) -> int:
-    """Export to PowerPoint, pairing related plots onto shared slides.
-
-    Returns the number of plots written, not the number of slides.
-    """
+    """One plot per slide, centred on a 16:9 blank layout."""
     from pptx import Presentation
     from pptx.util import Emu, Inches
 
@@ -233,22 +158,19 @@ def write_pptx(figures: list[tuple[str, object]], path: Path) -> int:
     blank = deck.slide_layouts[6]
 
     written = 0
-    for group in plan_slides(figures):
+    for _name, fig in figures:
         slide = deck.slides.add_slide(blank)
-        gutter = int(deck.slide_width * GUTTER_FRACTION)
-        cell_width = (deck.slide_width - gutter * (len(group) + 1)) // len(group)
+        image = io.BytesIO(_png_bytes(fig))
+        picture = slide.shapes.add_picture(image, Emu(0), Emu(0))
 
-        for position, (_name, fig) in enumerate(group):
-            picture = slide.shapes.add_picture(
-                io.BytesIO(_png_bytes(fig)), Emu(0), Emu(0)
-            )
-            scale = min(cell_width / picture.width, deck.slide_height / picture.height)
-            picture.width = int(picture.width * scale)
-            picture.height = int(picture.height * scale)
-            cell_left = gutter + position * (cell_width + gutter)
-            picture.left = int(cell_left + (cell_width - picture.width) / 2)
-            picture.top = int((deck.slide_height - picture.height) / 2)
-            written += 1
+        scale = min(
+            deck.slide_width / picture.width, deck.slide_height / picture.height
+        )
+        picture.width = int(picture.width * scale)
+        picture.height = int(picture.height * scale)
+        picture.left = int((deck.slide_width - picture.width) / 2)
+        picture.top = int((deck.slide_height - picture.height) / 2)
+        written += 1
 
     deck.save(str(path))
     return written

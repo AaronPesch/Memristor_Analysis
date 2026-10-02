@@ -49,6 +49,7 @@ import fig_yield  # noqa: E402
 import live_pipeline  # noqa: E402
 from app.core import preferences  # noqa: E402
 from app.core.modes import Mode  # noqa: E402
+from app.core.theme import DARK, LIGHT, apply_qt_theme  # noqa: E402
 
 WEB_DIR = HERE / "web"
 WIKI_URL = "https://github.com/AaronPesch/Memristor_Analysis/wiki"
@@ -473,7 +474,10 @@ class AnalysisWindow(QMainWindow):
 
     def on_dark_toggled(self, checked: bool) -> None:
         self.dark = checked
-        preferences.set_theme("dark" if checked else "light")
+        preferences.set_theme(DARK if checked else LIGHT)
+        # The plots are restyled through the payload, but the Qt chrome needs the
+        # palette from core/theme.py -- otherwise only the figures go dark.
+        apply_qt_theme(QApplication.instance(), DARK if checked else LIGHT)
         self.push()
 
     # ---- yield map ----------------------------------------------------------
@@ -680,6 +684,9 @@ def main() -> None:
     args = parser.parse_args()
 
     app = QApplication(sys.argv)
+    # Before the window is built, so a restored dark session opens dark instead
+    # of flashing the light palette first.
+    apply_qt_theme(app, preferences.get_theme())
     channel.export_static_assets()
     window = AnalysisWindow()
     window.show()

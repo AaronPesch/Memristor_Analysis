@@ -7,6 +7,7 @@
     html, body { margin: 0; height: 100%; background: transparent;
                  font-family: system-ui, sans-serif; overflow: hidden; }
     #plot { width: 100%; height: 100%; }
+    #panel { display: none; height: 100%; overflow: auto; }
     #placeholder { position: absolute; inset: 0; display: flex; align-items: center;
                    justify-content: center; color: #888; font-size: 15px;
                    text-align: center; padding: 0 40px; line-height: 1.6; }
@@ -19,6 +20,7 @@
 <body>
   <div id="placeholder">Connecting…</div>
   <div id="plot"></div>
+  <div id="panel"></div>
   <script src="analysis.js"></script>
 </body>
 </html>

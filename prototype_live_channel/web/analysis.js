@@ -9,6 +9,7 @@
 
 const CONFIG = { responsive: true, displaylogo: false, scrollZoom: true };
 const plotDiv = document.getElementById("plot");
+const panel = document.getElementById("panel");
 const placeholder = document.getElementById("placeholder");
 
 let bridge = null;
@@ -24,8 +25,31 @@ function applyTheme(theme) {
   placeholder.style.color = theme.font_color;
 }
 
+/* The overview tab is an HTML panel rather than a figure. It arrives over the
+ * same channel; only the payload shape differs. */
+function showHtml(payload) {
+  placeholder.style.display = "none";
+  Plotly.purge(plotDiv);
+  drawn = false;
+  currentKey = payload.key;
+  panel.innerHTML = payload.html;
+  panel.style.display = "block";
+  plotDiv.style.display = "none";
+  for (const button of panel.querySelectorAll(".chip[data-device]")) {
+    button.addEventListener("click", () =>
+      send({ kind: "drill", point: { name: button.dataset.device } })
+    );
+  }
+}
+
 function show(payload) {
   applyTheme(payload && payload.theme);
+
+  if (payload && payload.html) return showHtml(payload);
+  panel.style.display = "none";
+  panel.innerHTML = "";
+  plotDiv.style.display = "block";
+
   if (!payload || !payload.figure) {
     drawn = false;
     currentKey = null;

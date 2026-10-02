@@ -48,6 +48,7 @@ from PySide6.QtWidgets import (  # noqa: E402
 )
 
 import channel  # noqa: E402
+import dashboard_view  # noqa: E402
 import drilldown  # noqa: E402
 import exporters  # noqa: E402
 import fig_yield  # noqa: E402
@@ -57,6 +58,7 @@ from app.core.modes import Mode  # noqa: E402
 from app.core.theme import DARK, LIGHT, apply_qt_theme  # noqa: E402
 
 WEB_DIR = HERE / "web"
+OVERVIEW_KEY = "overview"
 WIKI_URL = "https://github.com/AaronPesch/Memristor_Analysis/wiki"
 WELCOME = (
     "Import data to start the analysis.\n\n"
@@ -74,6 +76,7 @@ class AnalysisWindow(QMainWindow):
         self.selection: set[str] = set()
         self.device_filter: list[str] | None = None
         self.drill: tuple | None = None
+        self.overview = None
         self._owner_cache: dict[str, list] = {}
         self.mode: Mode | None = None
         self.dark = preferences.get_theme() == "dark"
@@ -282,6 +285,14 @@ class AnalysisWindow(QMainWindow):
                 "figure": channel.figure_payload(fig, key, self.dark, None),
             }
 
+        category = self.category
+        if category is not None and category.key == OVERVIEW_KEY:
+            return {
+                "key": OVERVIEW_KEY,
+                "theme": theme,
+                "html": dashboard_view.render(self.overview, self.dark),
+            }
+
         key, fig = self.current_figure()
         if fig is None:
             return {"figure": None, "message": WELCOME, "theme": theme}
@@ -382,9 +393,9 @@ class AnalysisWindow(QMainWindow):
         self.worker.failed.connect(self.on_import_failed)
         self.thread.start()
 
-    @Slot(object, object)
-    def _on_import_finished(self, data, categories) -> None:
-        self.on_import_done(self._pending_mode, data, categories)
+    @Slot(object, object, object)
+    def _on_import_finished(self, data, categories, overview) -> None:
+        self.on_import_done(self._pending_mode, data, categories, overview)
 
     def _stop_thread(self) -> None:
         self._loading = False
@@ -396,22 +407,43 @@ class AnalysisWindow(QMainWindow):
         if hasattr(self, "progress"):
             self.progress.close()
 
-    def on_import_done(self, mode: Mode, data, categories) -> None:
+    def on_import_done(self, mode: Mode, data, categories, overview=None) -> None:
         self._stop_thread()
         self.mode = mode
         self.data = data
-        self.categories = categories
+        self.overview = overview
+        self.categories = self._with_overview(categories)
         self._owner_cache.clear()
         self.drill = None
         self.selection = set()
         self.device_filter = None
+        # The overview is the landing tab: whatever the last session had open,
+        # a fresh import starts here.
+        self._wanted_tab = 0
+        self._wanted_sub = 0
         self.populate_tabs()
         self.refresh_selection_ui()
-        total = sum(len(c.figures) for c in categories)
-        self.statusBar().showMessage(
+
+        total = sum(len(c.figures) for c in self.categories)
+        message = (
             f"{mode.value} level | stack {data.stack_id} | {len(data.devices)} devices "
-            f"| {len(categories)} categories | {total} plots"
+            f"| v_read {data.v_read:.3g} V | {total} plots"
         )
+        if overview is not None and overview.findings:
+            worst = overview.worst_severity
+            message += f" | {len(overview.findings)} data check(s): {worst}"
+        self.statusBar().showMessage(message)
+
+    def _with_overview(self, categories: list) -> list:
+        """Put the overview in front of the plot categories.
+
+        It is a Category with no figures, so it never reaches the exporters and
+        needs no special case there.
+        """
+        if self.overview is None:
+            return list(categories)
+        head = live_pipeline.Category(key=OVERVIEW_KEY, label="Overview")
+        return [head, *categories]
 
     def on_import_failed(self, message: str) -> None:
         self._stop_thread()
@@ -584,7 +616,7 @@ class AnalysisWindow(QMainWindow):
             self.categories = live_pipeline.build_device_categories(data)
         else:
             self.categories = live_pipeline.build_stack_categories(data)
-        self.categories = [c for c in self.categories if c.figures]
+        self.categories = self._with_overview([c for c in self.categories if c.figures])
         self._owner_cache.clear()
         self.drill = None
         self.populate_tabs()

@@ -5,6 +5,8 @@ Everything that replaces `write_html` + `QWebEngineView.load(file://)` lives her
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import traceback
 from pathlib import Path
@@ -19,6 +21,7 @@ from app.core.paths import DB_FILE
 from app.core.theme import DARK, LIGHT, PLOT_COLORS
 from app.plotting.config import Config
 
+import dashboard_data
 import live_pipeline
 
 HERE = Path(__file__).parent
@@ -142,7 +145,7 @@ class ImportWorker(QObject):
 
     progress = Signal(int)
     status = Signal(str)
-    finished = Signal(object, object)  # LoadedData, list[Category]
+    finished = Signal(object, object, object)  # LoadedData, Categories, Overview
     failed = Signal(str)
 
     def __init__(self, path: Path, mode: Mode) -> None:
@@ -153,16 +156,29 @@ class ImportWorker(QObject):
     @Slot()
     def run(self) -> None:
         try:
-            self.status.emit("Phase 1/2: importing Excel files into DuckDB...")
+            self.status.emit("Phase 1/3: importing Excel files into DuckDB...")
             self.progress.emit(5)
-            BatchConverter(DB_FILE).convert(path_to_glob(self.path, self.mode))
+            # BatchConverter collects per-file warnings and prints them; convert()
+            # returns only the database path, so capturing stdout is the only way
+            # to get them in front of the user without changing the converter.
+            log = io.StringIO()
+            with contextlib.redirect_stdout(log):
+                BatchConverter(DB_FILE).convert(path_to_glob(self.path, self.mode))
+            print(log.getvalue(), end="")
 
-            self.progress.emit(55)
-            self.status.emit("Phase 2/2: building figures...")
+            self.progress.emit(50)
+            self.status.emit("Phase 2/3: building figures...")
             cfg = Config(db_file=DB_FILE, output_dir=HERE, mode=self.mode)
             data, categories = live_pipeline.load_and_build(cfg)
 
+            self.progress.emit(85)
+            self.status.emit("Phase 3/3: checking the data...")
+            # Hashing every source file belongs on this thread, not the UI one.
+            overview = dashboard_data.collect(
+                data, DB_FILE, self.path, self.mode.value, import_log=log.getvalue()
+            )
+
             self.progress.emit(100)
-            self.finished.emit(data, categories)
+            self.finished.emit(data, categories, overview)
         except Exception as exc:
             self.failed.emit(f"{exc}\n\n{traceback.format_exc()}")

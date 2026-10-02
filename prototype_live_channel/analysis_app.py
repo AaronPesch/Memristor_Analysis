@@ -21,7 +21,12 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "src"))
 
 from PySide6.QtCore import QThread, QUrl, Qt, Slot  # noqa: E402
-from PySide6.QtGui import QAction, QDesktopServices, QKeySequence  # noqa: E402
+from PySide6.QtGui import (  # noqa: E402
+    QAction,
+    QColor,
+    QDesktopServices,
+    QKeySequence,
+)
 from PySide6.QtWebChannel import QWebChannel  # noqa: E402
 from PySide6.QtWebEngineCore import QWebEngineSettings  # noqa: E402
 from PySide6.QtWebEngineWidgets import QWebEngineView  # noqa: E402
@@ -211,6 +216,7 @@ class AnalysisWindow(QMainWindow):
         self.view.settings().setAttribute(
             QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls, True
         )
+        self._paint_page_background()
         outer.addWidget(self.view, 1)
         self.setCentralWidget(root)
         self.statusBar().showMessage("No data imported yet.")
@@ -263,17 +269,22 @@ class AnalysisWindow(QMainWindow):
         return f"{category.key}/{param_id}", category.figures[param_id]
 
     def current_payload(self) -> dict:
+        # Every payload carries the theme, including the one with no figure --
+        # the placeholder has to match the window too.
+        theme = channel.view_colors(self.dark)
+
         if self.drill is not None:
             fig, label = self.drill
             key = f"drill/{label}"
             return {
                 "key": key,
+                "theme": theme,
                 "figure": channel.figure_payload(fig, key, self.dark, None),
             }
 
         key, fig = self.current_figure()
         if fig is None:
-            return {"figure": None, "message": WELCOME}
+            return {"figure": None, "message": WELCOME, "theme": theme}
         payload = channel.figure_payload(
             fig, key, self.dark, preferences.get_scale(key)
         )
@@ -281,6 +292,7 @@ class AnalysisWindow(QMainWindow):
         # it lands instantly and on every tab at once.
         return {
             "key": key,
+            "theme": theme,
             "figure": drilldown.apply_highlight(
                 payload, self._trace_owners(key, fig), self.selection
             ),
@@ -472,12 +484,24 @@ class AnalysisWindow(QMainWindow):
         preferences.set_scale(key, "log" if checked else "linear")
         self.push()
 
+    def _paint_page_background(self) -> None:
+        """Paint the web view itself, not only the figures.
+
+        The page sets `background: transparent`, so whatever Chromium paints
+        underneath shows through -- white by default. That is invisible while a
+        figure fills the pane and glaring on the placeholder before any import.
+        """
+        self.view.page().setBackgroundColor(
+            QColor(channel.view_colors(self.dark)["paper_bgcolor"])
+        )
+
     def on_dark_toggled(self, checked: bool) -> None:
         self.dark = checked
         preferences.set_theme(DARK if checked else LIGHT)
-        # The plots are restyled through the payload, but the Qt chrome needs the
-        # palette from core/theme.py -- otherwise only the figures go dark.
+        # Three separate surfaces: the Qt chrome via the palette, the web view's
+        # own background, and the page contents via the pushed payload.
         apply_qt_theme(QApplication.instance(), DARK if checked else LIGHT)
+        self._paint_page_background()
         self.push()
 
     # ---- yield map ----------------------------------------------------------

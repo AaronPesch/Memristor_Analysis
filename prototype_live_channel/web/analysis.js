@@ -15,7 +15,17 @@ let bridge = null;
 let drawn = false;
 let currentKey = null;
 
+/* The page is transparent by default, so without this the placeholder sits on
+ * Chromium's white while the window around it is dark. */
+function applyTheme(theme) {
+  if (!theme) return;
+  document.documentElement.style.background = theme.paper_bgcolor;
+  document.body.style.background = theme.paper_bgcolor;
+  placeholder.style.color = theme.font_color;
+}
+
 function show(payload) {
+  applyTheme(payload && payload.theme);
   if (!payload || !payload.figure) {
     drawn = false;
     currentKey = null;

@@ -40,6 +40,16 @@ def export_static_assets() -> None:
         resource.close()
 
 
+def view_colors(dark: bool) -> dict:
+    """The palette the page itself is painted with.
+
+    The figures carry their own colors, but the area around them -- and the
+    placeholder shown before any import -- is the page's own background. Without
+    this it stays Chromium white inside a dark window.
+    """
+    return PLOT_COLORS[DARK if dark else LIGHT]
+
+
 def figure_payload(fig, key: str, dark: bool, scale: str | None) -> dict:
     """Serialize a figure and apply the current view options.
 

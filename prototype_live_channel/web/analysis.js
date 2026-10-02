@@ -35,9 +35,16 @@ function showHtml(payload) {
   panel.innerHTML = payload.html;
   panel.style.display = "block";
   plotDiv.style.display = "none";
-  for (const button of panel.querySelectorAll(".chip[data-device]")) {
+  // Device names and stack-map cells open that device's raw sweep.
+  for (const button of panel.querySelectorAll("[data-device]")) {
     button.addEventListener("click", () =>
       send({ kind: "drill", point: { name: button.dataset.device } })
+    );
+  }
+  // The overview is also a hub: these jump to the matching plot tab.
+  for (const button of panel.querySelectorAll("[data-goto]")) {
+    button.addEventListener("click", () =>
+      send({ kind: "goto", category: button.dataset.goto })
     );
   }
 }

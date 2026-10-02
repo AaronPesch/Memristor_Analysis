@@ -434,6 +434,18 @@ class AnalysisWindow(QMainWindow):
             message += f" | {len(overview.findings)} data check(s): {worst}"
         self.statusBar().showMessage(message)
 
+    def goto_category(self, key: str | None) -> None:
+        """Select a plot category by key -- the overview's jump-off links."""
+        if not key:
+            return
+        for index, category in enumerate(self.categories):
+            if category.key == key:
+                self.drill = None
+                self.back_button.setVisible(False)
+                self.category_bar.setCurrentIndex(index)
+                return
+        self.statusBar().showMessage(f"No tab for {key}.")
+
     def _with_overview(self, categories: list) -> list:
         """Put the overview in front of the plot categories.
 

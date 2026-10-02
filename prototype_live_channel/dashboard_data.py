@@ -67,6 +67,116 @@ class Stat:
 
 
 @dataclass
+class MapCell:
+    device: str
+    row: str
+    col: int
+    value: float
+    color: str
+    passed: bool
+
+
+@dataclass
+class StackSummary:
+    """A thumbnail of the stack map plus the yield headline, for the overview."""
+
+    metric: str
+    label: str
+    rows: list[str]
+    cols: list[int]
+    cells: list[MapCell]
+    operator: str
+    threshold: float
+    passed: int
+    tested: int
+
+    @property
+    def percent(self) -> float:
+        return 100.0 * self.passed / self.tested if self.tested else 0.0
+
+    def cell_at(self, row: str, col: int) -> MapCell | None:
+        for cell in self.cells:
+            if cell.row == row and cell.col == col:
+                return cell
+        return None
+
+
+# Viridis anchors, so the thumbnail reads the same way as the full stack map.
+_VIRIDIS = [
+    (0.00, (68, 1, 84)),
+    (0.25, (59, 82, 139)),
+    (0.50, (33, 145, 140)),
+    (0.75, (94, 201, 98)),
+    (1.00, (253, 231, 37)),
+]
+
+
+def _viridis(position: float) -> str:
+    position = min(max(position, 0.0), 1.0)
+    for (low, left), (high, right) in zip(_VIRIDIS, _VIRIDIS[1:]):
+        if position <= high:
+            span = high - low or 1.0
+            t = (position - low) / span
+            rgb = tuple(round(a + (b - a) * t) for a, b in zip(left, right))
+            return "#%02x%02x%02x" % rgb
+    return "#fde725"
+
+
+def build_stack_summary(data, devices: list[str]) -> StackSummary | None:
+    """Per-device medians placed on the grid, coloured and scored.
+
+    Reuses fig_yield rather than recomputing: the thumbnail and the full yield
+    map must never disagree about which devices pass.
+    """
+    import fig_yield
+
+    metric, label, is_log, operator = fig_yield.METRICS[0]  # Memory Window
+    if metric not in data.box_table.columns:
+        return None
+
+    values = fig_yield.device_medians(data.box_table, data.stack_id, devices, metric)
+    placed = {d: m.groups() for d in values if (m := DEVICE_RE.match(d))}
+    if len(placed) < 2:
+        return None
+
+    threshold = fig_yield.default_threshold(values)
+    scale = (
+        [np.log10(v) for v in values.values() if v > 0]
+        if is_log
+        else list(values.values())
+    )
+    low, high = (min(scale), max(scale)) if scale else (0.0, 1.0)
+    span = (high - low) or 1.0
+
+    cells = []
+    for device, (row, col) in placed.items():
+        value = values[device]
+        position = ((np.log10(value) if is_log and value > 0 else value) - low) / span
+        cells.append(
+            MapCell(
+                device=device,
+                row=row.upper(),
+                col=int(col),
+                value=float(value),
+                color=_viridis(float(position)),
+                passed=value >= threshold if operator == ">=" else value <= threshold,
+            )
+        )
+
+    return StackSummary(
+        metric=metric,
+        label=label,
+        rows=sorted({c.row for c in cells}),
+        cols=sorted({c.col for c in cells}),
+        cells=cells,
+        operator=operator,
+        threshold=threshold,
+        passed=sum(1 for c in cells if c.passed),
+        tested=len(cells),
+    )
+
+
+@dataclass
 class Overview:
     stack_id: str
     mode: str
@@ -80,6 +190,7 @@ class Overview:
     cycles_total: int
     measurement_types: dict[str, int]
     stats: list[Stat]
+    stack: StackSummary | None
     findings: list[Finding]
 
     @property
@@ -348,5 +459,6 @@ def collect(
         cycles_total=int(cycles_total),
         measurement_types=measurement_types,
         stats=build_stats(data.box_table),
+        stack=build_stack_summary(data, data.devices),
         findings=findings,
     )

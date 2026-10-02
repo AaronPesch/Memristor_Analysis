@@ -83,6 +83,59 @@ def _finding_card(finding) -> str:
     )
 
 
+def _stack_block(stack, muted: str) -> str:
+    """Stack-map thumbnail plus the yield headline, both as jump-off points."""
+    if stack is None:
+        return ""
+
+    header = "".join(f"<th>{c}</th>" for c in stack.cols)
+    body = ""
+    for row in stack.rows:
+        body += f'<tr><th class="rowlab">{html.escape(row)}</th>'
+        for col in stack.cols:
+            cell = stack.cell_at(row, col)
+            if cell is None:
+                body += '<td class="empty"></td>'
+                continue
+            verdict = "pass" if cell.passed else "fail"
+            body += (
+                f'<td><button class="cell {verdict}" data-device="{html.escape(cell.device)}"'
+                f' style="background:{cell.color}"'
+                f' title="{html.escape(cell.device)} · {html.escape(stack.label)} '
+                f'{cell.value:.4g} · {verdict.upper()} — Rohkurve öffnen">'
+                f"{html.escape(cell.device)}</button></td>"
+            )
+        body += "</tr>"
+
+    return f"""
+  <h2>Stack auf einen Blick</h2>
+  <div class="stack-row">
+    <div class="map-card">
+      <div class="card-head">
+        <span>{html.escape(stack.label)} je Position</span>
+        <button class="link" data-goto="spatial_maps_stack_level">Stack Map öffnen →</button>
+      </div>
+      <table class="minimap">
+        <thead><tr><th></th>{header}</tr></thead>
+        <tbody>{body}</tbody>
+      </table>
+      <div class="legend">dunkel = niedrig, hell = hoch · roter Rahmen = fail</div>
+    </div>
+    <div class="yield-card">
+      <div class="card-head">
+        <span>Yield</span>
+        <button class="link" data-goto="yield_map_stack_level">Yield Map öffnen →</button>
+      </div>
+      <div class="yield-value">{stack.percent:.1f}&thinsp;%</div>
+      <div class="yield-sub">{stack.passed} von {stack.tested} Devices</div>
+      <div class="yield-rule">{html.escape(stack.label)} {html.escape(stack.operator)}
+        {stack.threshold:.4g}</div>
+      <div class="hint" style="color:{muted}">Schwelle = Median über alle Devices;
+        in der Yield Map frei einstellbar</div>
+    </div>
+  </div>"""
+
+
 def render(overview: Overview, dark: bool) -> str:
     bg = "#1e1e1e" if dark else "#ffffff"
     panel = "#262626" if dark else "#f6f7f9"
@@ -148,6 +201,32 @@ def render(overview: Overview, dark: bool) -> str:
   td.unit, th.unit {{ text-align: left; color: {muted}; font-size: 11px; }}
   tbody tr:hover {{ background: {panel}; }}
   .muted {{ color: {muted}; }}
+  .stack-row {{ display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; }}
+  .map-card, .yield-card {{ background: {panel}; border: 1px solid {border};
+                            border-radius: 8px; padding: 12px 14px; }}
+  .yield-card {{ min-width: 190px; }}
+  .card-head {{ display: flex; gap: 16px; align-items: baseline;
+                justify-content: space-between; margin-bottom: 9px;
+                font-size: 11px; color: {muted}; text-transform: uppercase;
+                letter-spacing: .05em; }}
+  .link {{ background: none; border: none; color: #4c8dff; cursor: pointer;
+           font: inherit; text-transform: none; letter-spacing: 0; padding: 0; }}
+  .link:hover {{ text-decoration: underline; }}
+  .minimap {{ border-collapse: separate; border-spacing: 2px; width: auto; }}
+  .minimap th {{ color: {muted}; font-size: 10px; padding: 0 2px; border: none;
+                 text-align: center; }}
+  .minimap th.rowlab {{ text-align: right; padding-right: 5px; }}
+  .minimap td {{ padding: 0; border: none; }}
+  .minimap td.empty {{ width: 34px; height: 24px; }}
+  .cell {{ width: 36px; height: 24px; border-radius: 3px; border: 2px solid transparent;
+           color: #fff; font: 600 9px/1 system-ui, sans-serif; cursor: pointer;
+           text-shadow: 0 1px 2px rgba(0,0,0,.65); }}
+  .cell.fail {{ border-color: #c8493f; }}
+  .cell:hover {{ outline: 2px solid #4c8dff; }}
+  .legend {{ color: {muted}; font-size: 10px; margin-top: 8px; }}
+  .yield-value {{ font-size: 32px; font-weight: 600; line-height: 1.1; }}
+  .yield-sub {{ color: {muted}; font-size: 12px; }}
+  .yield-rule {{ margin-top: 7px; font-size: 11px; font-family: ui-monospace, monospace; }}
   .foot {{ color: {muted}; font-size: 11px; margin-top: 22px; }}
 </style>
 <div class="dash">
@@ -155,6 +234,7 @@ def render(overview: Overview, dark: bool) -> str:
   <div class="sub">{html.escape(overview.mode)}-Import · {types}</div>
   <div class="path">{html.escape(overview.source)}</div>
   <div class="tiles">{tiles}</div>
+{_stack_block(overview.stack, muted)}
 
   <h2>Datenqualität</h2>
   {quality}

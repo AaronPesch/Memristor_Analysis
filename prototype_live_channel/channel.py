@@ -121,6 +121,9 @@ class Bridge(QObject):
                 self.window.selection ^= {device}
         elif kind == "clear_selection":
             self.window.selection = set()
+        elif kind == "goto":
+            # Overview acts as a hub: jump straight to the matching plot tab.
+            self.window.goto_category(request.get("category"))
         elif kind == "drill":
             # Aggregate point -> the raw sweep behind it.
             device = self.window.resolve_device(request.get("point") or {})

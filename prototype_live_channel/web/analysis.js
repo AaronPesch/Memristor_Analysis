@@ -90,6 +90,8 @@ function pointRef(point) {
   if (!point) return null;
   return {
     name: (point.data && point.data.name) || null,
+    // One trace can hold every device (the 3D view); then identity is per point.
+    custom: typeof point.customdata === "string" ? point.customdata : null,
     x: point.x !== undefined ? point.x : null,
     y: point.y !== undefined ? point.y : null,
   };

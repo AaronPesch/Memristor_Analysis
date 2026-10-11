@@ -32,6 +32,7 @@ from app.plotting.fig_endurance import build_endurance_figs
 from app.plotting.fig_spatial_map_stack import build_stack_level_spatial_maps
 from app.plotting.pipeline import LoadedData, load_all
 
+import fig_stack3d
 import fig_yield
 
 
@@ -150,7 +151,21 @@ def build_stack_categories(data: LoadedData) -> list[Category]:
                 box_table=data.box_table,
                 stack_id=data.stack_id,
                 devices=data.devices,
-            ),
+            )
+            # Same data, rotatable, with height and colour free to carry
+            # different parameters. Lives beside the flat maps rather than in
+            # its own category.
+            + [
+                fig
+                for fig in [
+                    fig_stack3d.build_stack_3d(
+                        box_table=data.box_table,
+                        stack_id=data.stack_id,
+                        devices=data.devices,
+                    )
+                ]
+                if fig is not None
+            ],
         ),
         # Not in main -- FEATURES.md lists it, the code never had it.
         _collect(

@@ -49,6 +49,13 @@ def resolve_device(ref: dict, devices: list[str], stack_id: str) -> str | None:
     """
     known = set(devices)
 
+    # Per-point identity, used by traces where one trace holds every device
+    # (the 3D view). Checked against the known set, so a heatmap's PASS/FAIL
+    # customdata cannot be mistaken for a device.
+    custom = ref.get("custom")
+    if isinstance(custom, str) and custom in known:
+        return custom
+
     name = ref.get("name")
     if isinstance(name, str) and name:
         if name in known:

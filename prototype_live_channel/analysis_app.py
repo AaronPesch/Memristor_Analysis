@@ -51,6 +51,7 @@ import channel  # noqa: E402
 import dashboard_view  # noqa: E402
 import drilldown  # noqa: E402
 import exporters  # noqa: E402
+import fig_stack3d  # noqa: E402
 import fig_yield  # noqa: E402
 import live_pipeline  # noqa: E402
 from app.core import preferences  # noqa: E402
@@ -200,6 +201,24 @@ class AnalysisWindow(QMainWindow):
         controls.addWidget(self.yield_widget)
         self.yield_widget.setVisible(False)
 
+        # 3D controls. Height and colour are deliberately independent -- two
+        # parameters at once is the one thing the flat map cannot show.
+        self.view3d_widget = QWidget()
+        row3d = QHBoxLayout(self.view3d_widget)
+        row3d.setContentsMargins(14, 0, 0, 0)
+        row3d.addWidget(QLabel("Height"))
+        self.height_box = QComboBox()
+        row3d.addWidget(self.height_box)
+        row3d.addWidget(QLabel("Colour"))
+        self.colour_box = QComboBox()
+        row3d.addWidget(self.colour_box)
+        for box in (self.height_box, self.colour_box):
+            for column, label, _is_log in fig_stack3d.METRICS:
+                box.addItem(label, column)
+            box.currentIndexChanged.connect(lambda _=0: self.on_view3d_changed())
+        controls.addWidget(self.view3d_widget)
+        self.view3d_widget.setVisible(False)
+
         controls.addStretch(1)
         self.filter_button = QPushButton("Filter to selection")
         self.filter_button.clicked.connect(self.apply_device_filter)
@@ -297,7 +316,12 @@ class AnalysisWindow(QMainWindow):
         if fig is None:
             return {"figure": None, "message": WELCOME, "theme": theme}
         payload = channel.figure_payload(
-            fig, key, self.dark, preferences.get_scale(key)
+            fig,
+            key,
+            self.dark,
+            # A 3D scene carries its axes inside `scene`; applying a y-axis
+            # scale there would only invent a stray 2D axis.
+            None if key.endswith("/stack_3d") else preferences.get_scale(key),
         )
         # Highlighting is applied to the payload, not the figure: no rebuild, so
         # it lands instantly and on every tab at once.
@@ -501,6 +525,15 @@ class AnalysisWindow(QMainWindow):
         self.drill = None
         self.back_button.setVisible(False)
         key, fig = self.current_figure()
+
+        is_3d = bool(key and key.endswith("/stack_3d"))
+        self.view3d_widget.setVisible(is_3d)
+        # A 3D scene has no top-level y-axis, so the log toggle has nothing to
+        # act on there.
+        self.scale_box.setEnabled(not is_3d)
+        if is_3d and fig is not None:
+            self._sync_view3d_controls(fig)
+
         is_yield = bool(self.category and self.category.key.startswith("yield"))
         self.yield_widget.setVisible(is_yield)
         if is_yield and fig is not None:
@@ -549,6 +582,39 @@ class AnalysisWindow(QMainWindow):
         self.push()
 
     # ---- yield map ----------------------------------------------------------
+
+    # ---- 3D view ------------------------------------------------------------
+
+    def _sync_view3d_controls(self, fig) -> None:
+        state = (fig.layout.meta or {}).get("stack3d") or {}
+        for box, key in ((self.height_box, "height"), (self.colour_box, "color")):
+            index = box.findData(state.get(key))
+            if index >= 0:
+                box.blockSignals(True)
+                box.setCurrentIndex(index)
+                box.blockSignals(False)
+
+    def on_view3d_changed(self) -> None:
+        category = self.category
+        if category is None or self.data is None or "stack_3d" not in category.figures:
+            return
+        devices = self.device_filter or self.data.devices
+        rebuilt = fig_stack3d.build_stack_3d(
+            box_table=self.data.box_table,
+            stack_id=self.data.stack_id,
+            devices=devices,
+            height=self.height_box.currentData(),
+            color=self.colour_box.currentData(),
+        )
+        if rebuilt is None:
+            self.statusBar().showMessage("No data for that combination.")
+            return
+        category.figures["stack_3d"] = rebuilt
+        # A different height axis is a different plot; drop the cached owners so
+        # highlighting still maps correctly.
+        self._owner_cache.pop(f"{category.key}/stack_3d", None)
+        self.statusBar().showMessage(rebuilt.layout.title.text)
+        self.push()
 
     def on_yield_changed(self) -> None:
         category = self.category
@@ -718,6 +784,7 @@ def pretty_label(param_id: str) -> str:
         "AI": "|Current| vs Voltage",
         "NORM_COND": "Normalized Conductance",
         "butterfly_curve": "Butterfly Curve",
+        "stack_3d": "3D View",
         "VSET": "V Set",
         "V_set": "V Set",
         "V_reset": "V Reset",

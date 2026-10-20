@@ -150,3 +150,68 @@ def test_the_hint_names_both_ends():
     text = axisrange.describe((1234.5, 6.7e8))
     assert "1,234" in text or "1234" in text
     assert "e+08" in text or "670000000" in text
+
+
+# ── a non-positive lower bound on a log axis ─────────────────────────────────
+
+
+def test_zero_lower_bound_is_lifted_to_the_smallest_measured_value():
+    """log10(0) is -inf, which Python serializes as the token -Infinity. JSON
+    has no such token, so the page would reject the whole message."""
+    bounds, note = axisrange.clamp_for_log((0.0, 1e6), floor=12.5)
+    assert bounds == (12.5, 1e6)
+    assert "do not work on a log axis" in note
+    assert "12.5" in note
+
+
+def test_a_negative_lower_bound_is_lifted_the_same_way():
+    bounds, note = axisrange.clamp_for_log((-500.0, 1e6), floor=2.0)
+    assert bounds == (2.0, 1e6)
+    assert note is not None
+
+
+def test_a_positive_lower_bound_is_left_alone():
+    bounds, note = axisrange.clamp_for_log((10.0, 1e6), floor=2.0)
+    assert bounds == (10.0, 1e6)
+    assert note is None
+
+
+def test_an_upper_bound_at_or_below_zero_is_refused():
+    """Nothing in that interval can sit on a log axis at all."""
+    with pytest.raises(ValueError, match="at or below zero"):
+        axisrange.clamp_for_log((-10.0, 0.0), floor=2.0)
+    with pytest.raises(ValueError, match="at or below zero"):
+        axisrange.clamp_for_log((-10.0, -1.0), floor=2.0)
+
+
+def test_clamping_needs_something_positive_to_fall_back_to():
+    with pytest.raises(ValueError, match="No positive data"):
+        axisrange.clamp_for_log((0.0, 1e6), floor=None)
+
+
+def test_no_range_passes_through_clamping():
+    assert axisrange.clamp_for_log(None, floor=2.0) == (None, None)
+
+
+def test_the_clamped_range_survives_serialization():
+    """The point of clamping: the payload has to stay valid JSON."""
+    import json
+
+    bounds, _note = axisrange.clamp_for_log((0.0, 1e6), floor=10.0)
+    payload = {"layout": {"yaxis": {"type": "log"}}}
+    axisrange.apply_range(payload, "yaxis", bounds)
+    text = json.dumps(payload)
+    assert "Infinity" not in text
+    assert json.loads(text)["layout"]["yaxis"]["range"] == pytest.approx([1.0, 6.0])
+
+
+def test_the_positive_floor_ignores_zero_and_negatives(stack_categories):
+    _data, categories = stack_categories
+    boxplots = next(c for c in categories if c.key.startswith("boxplots"))
+    fig = boxplots.figures["R_HRS"]
+
+    floor = axisrange.positive_floor(fig, "yaxis")
+    low, _high = axisrange.data_bounds(fig, "yaxis")
+    assert floor is not None
+    assert floor > 0
+    assert floor >= low

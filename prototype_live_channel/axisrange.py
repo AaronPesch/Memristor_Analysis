@@ -58,6 +58,49 @@ def data_bounds(fig, axis: str) -> tuple[float, float] | None:
     return min(values), max(values)
 
 
+def positive_floor(fig, axis: str) -> float | None:
+    """The smallest value above zero on `axis` -- what a log axis can start at."""
+    attribute = "x" if axis == "xaxis" else "y"
+    smallest = None
+    for trace in fig.data:
+        for item in _decode(getattr(trace, attribute, None)):
+            if isinstance(item, (int, float)) and item == item and item > 0:
+                if smallest is None or item < smallest:
+                    smallest = float(item)
+    return smallest
+
+
+def clamp_for_log(
+    bounds: tuple[float, float] | None, floor: float | None
+) -> tuple[tuple[float, float] | None, str | None]:
+    """Lift a non-positive lower bound onto a log axis.
+
+    log10(0) is -inf, and Python serializes that as the token `-Infinity`, which
+    JSON does not define -- the page's JSON.parse would reject the whole message
+    and show nothing. So zero cannot simply be passed through; the lowest a log
+    axis can start at is the smallest value actually measured.
+
+    Returns (bounds, note); the note is None when nothing had to change. Raises
+    ValueError when no positive window remains at all.
+    """
+    if bounds is None:
+        return None, None
+    lower, upper = bounds
+    if upper <= 0:
+        raise ValueError(
+            "A log axis cannot show values at or below zero - "
+            "the upper bound has to be positive, or switch the axis to linear."
+        )
+    if lower > 0:
+        return bounds, None
+    if floor is None:
+        raise ValueError("No positive data on this axis to start from.")
+    return (floor, upper), (
+        f"Values at or below zero do not work on a log axis - "
+        f"lower bound moved to the smallest measured value, {_fmt(floor)}."
+    )
+
+
 def parse_bounds(low: str, high: str) -> tuple[float, float] | None:
     """Read the two inputs. Raises ValueError with a message fit for the UI."""
     low, high = low.strip().replace(",", "."), high.strip().replace(",", ".")

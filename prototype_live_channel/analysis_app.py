@@ -679,24 +679,52 @@ class AnalysisWindow(QMainWindow):
             field.setText(f"{value:.6g}" if chosen else "")
             field.blockSignals(False)
 
+    def _axis_is_log(self, key: str, fig, axis: str) -> bool:
+        """Whether the value axis is logarithmic right now.
+
+        The stored scale preference only ever applies to the y-axis, so a CDF --
+        whose values sit on x -- takes its axis type from the builder.
+        """
+        if axis == "yaxis":
+            stored = preferences.get_scale(key)
+            if stored in ("log", "linear"):
+                return stored == "log"
+        return getattr(getattr(fig.layout, axis), "type", None) == "log"
+
     def on_range_applied(self) -> None:
         key, fig = self.current_figure()
         if key is None or fig is None:
             return
+        axis = axisrange.value_axis(self.category.key)
+        if axis is None:
+            return
+
+        note = None
         try:
             bounds = axisrange.parse_bounds(
                 self.range_low.text(), self.range_high.text()
             )
+            if bounds is not None and self._axis_is_log(key, fig, axis):
+                bounds, note = axisrange.clamp_for_log(
+                    bounds, axisrange.positive_floor(fig, axis)
+                )
         except ValueError as exc:
             self.statusBar().showMessage(str(exc))
             return
 
         self.axis_ranges[key] = bounds
-        axis = axisrange.value_axis(self.category.key)
+        if bounds is not None:
+            # Reflect what was actually applied, clamping included, so the
+            # fields never show something the plot does not.
+            self.range_low.setText(f"{bounds[0]:.6g}")
+            self.range_high.setText(f"{bounds[1]:.6g}")
+
+        which = "x" if axis == "xaxis" else "y"
         if bounds is None:
             self.statusBar().showMessage("Range cleared.")
+        elif note:
+            self.statusBar().showMessage(note)
         else:
-            which = "x" if axis == "xaxis" else "y"
             self.statusBar().showMessage(
                 f"{which}-axis limited to {bounds[0]:.6g} … {bounds[1]:.6g}"
             )

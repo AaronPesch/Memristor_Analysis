@@ -428,3 +428,85 @@ def test_the_stored_figure_keeps_its_own_range(window, categories_copy):
     window.on_range_applied()
 
     assert fig.layout.yaxis.range == before
+
+
+def test_zero_on_a_log_axis_is_lifted_and_reported(qtbot, window, categories_copy):
+    """Typing 0 used to be ignored without a word. Now it is clamped to the
+    smallest measured value and the status bar says so."""
+    import axisrange
+
+    data, categories = categories_copy
+    feed(window, data, categories)
+    _select(window, "boxplots_stack_level", "R_HRS")
+    if not window.scale_box.isChecked():
+        window.scale_box.setChecked(True)
+        qtbot.wait(400)
+
+    key, fig = window.current_figure()
+    if not window._axis_is_log(key, fig, "yaxis"):
+        pytest.skip("R_HRS is not on a log axis here")
+    floor = axisrange.positive_floor(fig, "yaxis")
+
+    window.range_low.setText("0")
+    window.range_high.setText("1e6")
+    window.on_range_applied()
+    qtbot.wait(900)
+
+    message = window.statusBar().currentMessage()
+    assert "log axis" in message
+    assert window.axis_ranges[key][0] == pytest.approx(floor)
+    # The field must not keep showing a zero the plot is not using.
+    assert float(window.range_low.text()) > 0
+
+    axis = json.loads(
+        run_js(
+            qtbot,
+            window,
+            "JSON.stringify((document.getElementById('plot').layout||{}).yaxis||{})",
+        )
+    )
+    import numpy as np
+
+    assert axis["range"][0] == pytest.approx(float(np.log10(floor)), rel=1e-6)
+
+
+def test_a_range_entirely_below_zero_is_refused_on_a_log_axis(
+    qtbot, window, categories_copy
+):
+    data, categories = categories_copy
+    feed(window, data, categories)
+    _select(window, "boxplots_stack_level", "R_HRS")
+    if not window.scale_box.isChecked():
+        window.scale_box.setChecked(True)
+        qtbot.wait(400)
+
+    key, fig = window.current_figure()
+    if not window._axis_is_log(key, fig, "yaxis"):
+        pytest.skip("R_HRS is not on a log axis here")
+
+    window.range_low.setText("-10")
+    window.range_high.setText("-1")
+    window.on_range_applied()
+
+    assert "at or below zero" in window.statusBar().currentMessage()
+    assert key not in window.axis_ranges
+
+
+def test_zero_is_fine_on_a_linear_axis(qtbot, window, categories_copy):
+    """The clamping is a log-axis constraint, not a general one."""
+    data, categories = categories_copy
+    feed(window, data, categories)
+    _select(window, "boxplots_stack_level", "VSET")
+    if window.scale_box.isChecked():
+        window.scale_box.setChecked(False)
+        qtbot.wait(400)
+
+    key, fig = window.current_figure()
+    if window._axis_is_log(key, fig, "yaxis"):
+        pytest.skip("V_set is on a log axis here")
+
+    window.range_low.setText("0")
+    window.range_high.setText("2")
+    window.on_range_applied()
+    assert window.axis_ranges[key] == (0.0, 2.0)
+    assert "log axis" not in window.statusBar().currentMessage()

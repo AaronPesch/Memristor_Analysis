@@ -14,8 +14,8 @@ from dashboard_data import Overview, Stat
 
 SEVERITY_STYLE = {
     "error": ("#c8493f", "Problem"),
-    "warning": ("#d08b2c", "Warnung"),
-    "info": ("#4c8dff", "Hinweis"),
+    "warning": ("#d08b2c", "Warning"),
+    "info": ("#4c8dff", "Note"),
 }
 
 
@@ -69,11 +69,11 @@ def _finding_card(finding) -> str:
         rest = len(finding.devices) - len(shown)
         chips = "".join(
             f'<button class="chip" data-device="{html.escape(d)}" '
-            f'title="Rohkurven von {html.escape(d)} ansehen">{html.escape(d)}</button>'
+            f'title="Open the raw sweep of {html.escape(d)}">{html.escape(d)}</button>'
             for d in shown
         )
         if rest:
-            chips += f'<span class="muted">+{rest} weitere</span>'
+            chips += f'<span class="muted">+{rest} more</span>'
         chips = f'<div class="chips">{chips}</div>'
     return (
         f'<div class="finding" style="border-left-color:{color}">'
@@ -102,36 +102,36 @@ def _stack_block(stack, muted: str) -> str:
                 f'<td><button class="cell {verdict}" data-device="{html.escape(cell.device)}"'
                 f' style="background:{cell.color}"'
                 f' title="{html.escape(cell.device)} · {html.escape(stack.label)} '
-                f'{cell.value:.4g} · {verdict.upper()} — Rohkurve öffnen">'
+                f'{cell.value:.4g} · {verdict.upper()} — open the raw sweep">'
                 f"{html.escape(cell.device)}</button></td>"
             )
         body += "</tr>"
 
     return f"""
-  <h2>Stack auf einen Blick</h2>
+  <h2>Stack at a glance</h2>
   <div class="stack-row">
     <div class="map-card">
       <div class="card-head">
-        <span>{html.escape(stack.label)} je Position</span>
-        <button class="link" data-goto="spatial_maps_stack_level">Stack Map öffnen →</button>
+        <span>{html.escape(stack.label)} by position</span>
+        <button class="link" data-goto="spatial_maps_stack_level">Open stack map →</button>
       </div>
       <table class="minimap">
         <thead><tr><th></th>{header}</tr></thead>
         <tbody>{body}</tbody>
       </table>
-      <div class="legend">dunkel = niedrig, hell = hoch · roter Rahmen = fail</div>
+      <div class="legend">dark = low, bright = high · red outline = fail</div>
     </div>
     <div class="yield-card">
       <div class="card-head">
         <span>Yield</span>
-        <button class="link" data-goto="yield_map_stack_level">Yield Map öffnen →</button>
+        <button class="link" data-goto="yield_map_stack_level">Open yield map →</button>
       </div>
       <div class="yield-value">{stack.percent:.1f}&thinsp;%</div>
-      <div class="yield-sub">{stack.passed} von {stack.tested} Devices</div>
+      <div class="yield-sub">{stack.passed} of {stack.tested} devices</div>
       <div class="yield-rule">{html.escape(stack.label)} {html.escape(stack.operator)}
         {stack.threshold:.4g}</div>
-      <div class="hint" style="color:{muted}">Schwelle = Median über alle Devices;
-        in der Yield Map frei einstellbar</div>
+      <div class="hint" style="color:{muted}">Threshold = median across all devices;
+        adjustable in the yield map</div>
     </div>
   </div>"""
 
@@ -149,17 +149,17 @@ def render(overview: Overview, dark: bool) -> str:
     )
     tiles = (
         _tile("Devices", str(len(overview.devices)))
-        + _tile("Endurance-Sets", str(overview.n_sets), f"{overview.n_resets} Resets")
-        + _tile("Zyklen", f"{overview.cycles_total:,}")
-        + _tile("Zeilen in der DB", f"{overview.db_rows:,}")
-        + _tile("v_read", f"{overview.v_read:.3g} V", "Basis für R_LRS / R_HRS")
+        + _tile("Endurance sets", str(overview.n_sets), f"{overview.n_resets} resets")
+        + _tile("Cycles", f"{overview.cycles_total:,}")
+        + _tile("Rows in the database", f"{overview.db_rows:,}")
+        + _tile("v_read", f"{overview.v_read:.3g} V", "basis for R_LRS / R_HRS")
     )
 
     if overview.findings:
         cards = "".join(_finding_card(f) for f in overview.findings)
         quality = f'<div class="findings">{cards}</div>'
     else:
-        quality = '<div class="ok">Keine Auffälligkeiten gefunden.</div>'
+        quality = '<div class="ok">Nothing unusual found.</div>'
 
     rows = "".join(_stat_row(s) for s in overview.stats)
 
@@ -231,28 +231,28 @@ def render(overview: Overview, dark: bool) -> str:
 </style>
 <div class="dash">
   <h1>{html.escape(overview.stack_id)}</h1>
-  <div class="sub">{html.escape(overview.mode)}-Import · {types}</div>
+  <div class="sub">{html.escape(overview.mode)}-level import · {types}</div>
   <div class="path">{html.escape(overview.source)}</div>
   <div class="tiles">{tiles}</div>
 {_stack_block(overview.stack, muted)}
 
-  <h2>Datenqualität</h2>
+  <h2>Data quality</h2>
   {quality}
 
-  <h2>Kennzahlen je Parameter</h2>
+  <h2>Key figures per parameter</h2>
   <table>
     <thead><tr>
-      <th class="name">Parameter</th><th class="unit">Einheit</th><th>N</th>
-      <th>Median</th><th>Mittel</th><th>Std</th><th>CV</th>
+      <th class="name">Parameter</th><th class="unit">Unit</th><th>N</th>
+      <th>Median</th><th>Mean</th><th>Std</th><th>CV</th>
       <th>p10</th><th>p90</th><th>Min</th><th>Max</th>
     </tr></thead>
     <tbody>{rows}</tbody>
   </table>
 
   <div class="foot">
-    Tabellen in der Datenbank: {html.escape(" · ".join(overview.db_tables))}
-    &nbsp;|&nbsp; erstellt {datetime.now():%Y-%m-%d %H:%M}
-    &nbsp;|&nbsp; Device anklicken öffnet dessen Rohkurve
+    Tables in the database: {html.escape(" · ".join(overview.db_tables))}
+    &nbsp;|&nbsp; generated {datetime.now():%Y-%m-%d %H:%M}
+    &nbsp;|&nbsp; click a device to open its raw sweep
   </div>
 </div>
 """

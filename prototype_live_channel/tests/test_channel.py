@@ -277,3 +277,154 @@ def test_import_through_the_worker_thread(qtbot, window, synthetic_stack):
     assert window.thread is None, "the worker thread was torn down"
     assert window.overview is not None
     assert window.category_bar.tabText(0) == "Overview"
+
+
+# ── the value-axis range ─────────────────────────────────────────────────────
+
+
+def _select(win, category_key, param_id):
+    keys = [c.key for c in win.categories]
+    index = keys.index(category_key)
+    win.category_bar.setCurrentIndex(index)
+    win.sub_bar.setCurrentIndex(win.categories[index].param_ids.index(param_id))
+
+
+def test_range_controls_appear_only_where_a_value_axis_exists(
+    qtbot, window, categories_copy
+):
+    data, categories = categories_copy
+    feed(window, data, categories)
+
+    _select(window, "boxplots_stack_level", "VSET")
+    assert window.range_widget.isVisible()
+    assert window.range_hint.text().startswith("y:")
+
+    _select(window, "cdfs_stack_level", "VSET")
+    assert window.range_widget.isVisible()
+    # A CDF keeps cumulative probability on y, so the range applies to x.
+    assert window.range_hint.text().startswith("x:")
+
+    _select(window, "spatial_maps_stack_level", "spatial_VSET")
+    assert not window.range_widget.isVisible()
+
+
+def test_the_hint_reports_the_data_extent(window, categories_copy):
+    data, categories = categories_copy
+    feed(window, data, categories)
+    _select(window, "boxplots_stack_level", "VSET")
+    assert "data spans" in window.range_hint.text()
+
+
+def test_applying_a_range_reaches_the_page(qtbot, window, categories_copy):
+    data, categories = categories_copy
+    feed(window, data, categories)
+    _select(window, "boxplots_stack_level", "VSET")
+
+    window.range_low.setText("0.5")
+    window.range_high.setText("2.5")
+    window.on_range_applied()
+    qtbot.wait(900)
+
+    axis = json.loads(
+        run_js(
+            qtbot,
+            window,
+            "JSON.stringify((document.getElementById('plot').layout||{}).yaxis||{})",
+        )
+    )
+    assert axis.get("range") == pytest.approx([0.5, 2.5])
+    assert axis.get("autorange") is False
+
+
+def test_a_log_axis_receives_exponents(qtbot, window, categories_copy):
+    """R_HRS is drawn on a log axis; Plotly reads its range as decades."""
+    data, categories = categories_copy
+    feed(window, data, categories)
+    _select(window, "boxplots_stack_level", "R_HRS")
+    if not window.scale_box.isChecked():
+        window.scale_box.setChecked(True)
+        qtbot.wait(400)
+
+    window.range_low.setText("1e3")
+    window.range_high.setText("1e6")
+    window.on_range_applied()
+    qtbot.wait(900)
+
+    axis = json.loads(
+        run_js(
+            qtbot,
+            window,
+            "JSON.stringify((document.getElementById('plot').layout||{}).yaxis||{})",
+        )
+    )
+    if axis.get("type") == "log":
+        assert axis.get("range") == pytest.approx([3.0, 6.0])
+    else:
+        assert axis.get("range") == pytest.approx([1e3, 1e6])
+
+
+def test_auto_restores_the_automatic_range(qtbot, window, categories_copy):
+    data, categories = categories_copy
+    feed(window, data, categories)
+    _select(window, "boxplots_stack_level", "VSET")
+
+    window.range_low.setText("0.5")
+    window.range_high.setText("2.5")
+    window.on_range_applied()
+    qtbot.wait(700)
+
+    window.on_range_reset()
+    qtbot.wait(700)
+    axis = json.loads(
+        run_js(
+            qtbot,
+            window,
+            "JSON.stringify((document.getElementById('plot').layout||{}).yaxis||{})",
+        )
+    )
+    assert "range" not in axis or axis.get("autorange") is not False
+
+
+def test_a_bad_range_reports_and_changes_nothing(window, categories_copy):
+    data, categories = categories_copy
+    feed(window, data, categories)
+    _select(window, "boxplots_stack_level", "VSET")
+    key, _fig = window.current_figure()
+
+    window.range_low.setText("1")
+    window.range_high.setText("")
+    window.on_range_applied()
+    assert "both" in window.statusBar().currentMessage()
+    assert key not in window.axis_ranges
+
+
+def test_the_range_is_remembered_per_plot(window, categories_copy):
+    data, categories = categories_copy
+    feed(window, data, categories)
+
+    _select(window, "boxplots_stack_level", "VSET")
+    window.range_low.setText("0.5")
+    window.range_high.setText("2.5")
+    window.on_range_applied()
+
+    _select(window, "boxplots_stack_level", "R_HRS")
+    assert window.range_low.text() == "", "a different plot starts automatic"
+
+    _select(window, "boxplots_stack_level", "VSET")
+    assert window.range_low.text() == "0.5"
+    assert window.range_high.text() == "2.5"
+
+
+def test_the_stored_figure_keeps_its_own_range(window, categories_copy):
+    """Clipping belongs on the payload; exports must show the full data."""
+    data, categories = categories_copy
+    feed(window, data, categories)
+    _select(window, "boxplots_stack_level", "VSET")
+    _key, fig = window.current_figure()
+    before = fig.layout.yaxis.range
+
+    window.range_low.setText("0.5")
+    window.range_high.setText("2.5")
+    window.on_range_applied()
+
+    assert fig.layout.yaxis.range == before

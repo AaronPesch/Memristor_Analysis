@@ -95,6 +95,7 @@ Den Stack-Ordner dann mit Ctrl+Shift+O importieren.
 | Doppelklick ins Leere | Auswahl aufheben |
 | **Strg+Klick** (bzw. Cmd) | **Drill-down**: die rohe I–V-Kennlinie hinter diesem Punkt |
 | *Filter to selection* | Builder auf die ausgewaehlten Devices einschraenken (rechnet neu) |
+| *Value axis* from/to | sichtbaren Wertebereich festlegen (Boxplots, CDF, Korrelation) |
 
 Zwei Dinge daran sind bewusst so gebaut:
 
@@ -103,6 +104,13 @@ Zwei Dinge daran sind bewusst so gebaut:
   sofort in jedem Tab, und die gespeicherte Figure bleibt unveraendert — der
   Export sieht weiterhin genau das, was die Builder erzeugt haben. Aggregat-
   kurven wie *All Devices (unified)* gehoeren keinem Device und bleiben stehen.
+- **Der Wertebereich gilt der Wertachse, nicht pauschal y.** Bei Boxplots und
+  Korrelation liegt der Messwert auf y, bei einer CDF auf x — dort traegt y die
+  kumulierte Wahrscheinlichkeit in Prozent, und eine y-Begrenzung wuerde die
+  Prozentachse beschneiden statt die Daten. Neben den Eingabefeldern steht,
+  welchen Bereich die Daten tatsaechlich abdecken. Auf einer Log-Achse erwartet
+  Plotly Dekaden-Exponenten; die Umrechnung passiert im Hintergrund, eingegeben
+  werden echte Werte.
 - **Der Zyklus wird nicht geraten.** Nur Endurance-Plots tragen die Zyklusnummer
   auf der x-Achse; dort fuehrt Strg+Klick exakt zu diesem Zyklus. Eine CDF
   sortiert ihre Werte und ein Boxplot gruppiert sie — der Punktindex sagt dort

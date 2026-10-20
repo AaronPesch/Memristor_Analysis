@@ -47,6 +47,7 @@ from PySide6.QtWidgets import (  # noqa: E402
     QWidget,
 )
 
+import axisrange  # noqa: E402
 import channel  # noqa: E402
 import dashboard_data  # noqa: E402
 import dashboard_view  # noqa: E402
@@ -80,6 +81,7 @@ class AnalysisWindow(QMainWindow):
         self.drill: tuple | None = None
         self.overview = None
         self.overview_metric: str | None = None
+        self.axis_ranges: dict[str, tuple[float, float] | None] = {}
         self._owner_cache: dict[str, list] = {}
         self.mode: Mode | None = None
         self.dark = preferences.get_theme() == "dark"
@@ -221,6 +223,33 @@ class AnalysisWindow(QMainWindow):
         controls.addWidget(self.view3d_widget)
         self.view3d_widget.setVisible(False)
 
+        # Range on the axis carrying the measured values -- y for boxplots and
+        # correlation, x for a CDF, where y is cumulative probability.
+        self.range_widget = QWidget()
+        range_row = QHBoxLayout(self.range_widget)
+        range_row.setContentsMargins(14, 0, 0, 0)
+        range_row.addWidget(QLabel("Value axis"))
+        self.range_low = QLineEdit()
+        self.range_low.setFixedWidth(90)
+        self.range_low.setPlaceholderText("from")
+        range_row.addWidget(self.range_low)
+        self.range_high = QLineEdit()
+        self.range_high.setFixedWidth(90)
+        self.range_high.setPlaceholderText("to")
+        range_row.addWidget(self.range_high)
+        for field in (self.range_low, self.range_high):
+            field.returnPressed.connect(self.on_range_applied)
+        apply_range = QPushButton("Apply")
+        apply_range.clicked.connect(self.on_range_applied)
+        range_row.addWidget(apply_range)
+        reset_range = QPushButton("Auto")
+        reset_range.clicked.connect(self.on_range_reset)
+        range_row.addWidget(reset_range)
+        self.range_hint = QLabel()
+        range_row.addWidget(self.range_hint)
+        controls.addWidget(self.range_widget)
+        self.range_widget.setVisible(False)
+
         controls.addStretch(1)
         self.filter_button = QPushButton("Filter to selection")
         self.filter_button.clicked.connect(self.apply_device_filter)
@@ -328,6 +357,10 @@ class AnalysisWindow(QMainWindow):
             # scale there would only invent a stray 2D axis.
             None if key.endswith("/stack_3d") else preferences.get_scale(key),
         )
+        axis = axisrange.value_axis(category.key) if category else None
+        if axis:
+            axisrange.apply_range(payload, axis, self.axis_ranges.get(key))
+
         # Highlighting is applied to the payload, not the figure: no rebuild, so
         # it lands instantly and on every tab at once.
         return {
@@ -443,6 +476,7 @@ class AnalysisWindow(QMainWindow):
         self.overview = overview
         self.categories = self._with_overview(categories)
         self._owner_cache.clear()
+        self.axis_ranges.clear()
         self.drill = None
         self.selection = set()
         self.device_filter = None
@@ -576,6 +610,8 @@ class AnalysisWindow(QMainWindow):
         if is_3d and fig is not None:
             self._sync_view3d_controls(fig)
 
+        self._sync_range_controls(key, fig)
+
         is_yield = bool(self.category and self.category.key.startswith("yield"))
         self.yield_widget.setVisible(is_yield)
         if is_yield and fig is not None:
@@ -624,6 +660,57 @@ class AnalysisWindow(QMainWindow):
         self.push()
 
     # ---- yield map ----------------------------------------------------------
+
+    # ---- value-axis range ---------------------------------------------------
+
+    def _sync_range_controls(self, key: str | None, fig) -> None:
+        axis = axisrange.value_axis(self.category.key) if self.category else None
+        self.range_widget.setVisible(bool(axis) and fig is not None)
+        if not axis or fig is None:
+            return
+
+        bounds = axisrange.data_bounds(fig, axis)
+        which = "x" if axis == "xaxis" else "y"
+        self.range_hint.setText(f"{which}: {axisrange.describe(bounds)}")
+
+        chosen = self.axis_ranges.get(key)
+        for field, value in zip((self.range_low, self.range_high), chosen or ("", "")):
+            field.blockSignals(True)
+            field.setText(f"{value:.6g}" if chosen else "")
+            field.blockSignals(False)
+
+    def on_range_applied(self) -> None:
+        key, fig = self.current_figure()
+        if key is None or fig is None:
+            return
+        try:
+            bounds = axisrange.parse_bounds(
+                self.range_low.text(), self.range_high.text()
+            )
+        except ValueError as exc:
+            self.statusBar().showMessage(str(exc))
+            return
+
+        self.axis_ranges[key] = bounds
+        axis = axisrange.value_axis(self.category.key)
+        if bounds is None:
+            self.statusBar().showMessage("Range cleared.")
+        else:
+            which = "x" if axis == "xaxis" else "y"
+            self.statusBar().showMessage(
+                f"{which}-axis limited to {bounds[0]:.6g} … {bounds[1]:.6g}"
+            )
+        self.push()
+
+    def on_range_reset(self) -> None:
+        key, _fig = self.current_figure()
+        if key is None:
+            return
+        self.axis_ranges.pop(key, None)
+        self.range_low.clear()
+        self.range_high.clear()
+        self.statusBar().showMessage("Range back to automatic.")
+        self.push()
 
     # ---- 3D view ------------------------------------------------------------
 
@@ -746,6 +833,7 @@ class AnalysisWindow(QMainWindow):
             self.categories = live_pipeline.build_stack_categories(data)
         self.categories = self._with_overview([c for c in self.categories if c.figures])
         self._owner_cache.clear()
+        self.axis_ranges.clear()
         self.drill = None
         self.populate_tabs()
         self.refresh_selection_ui()

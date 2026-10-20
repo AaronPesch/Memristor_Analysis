@@ -1,2 +1,2 @@
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "prototype_live_channel/tests"]

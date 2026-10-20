@@ -124,15 +124,22 @@ def _viridis(position: float) -> str:
     return "#fde725"
 
 
-def metric_options(box_table: pd.DataFrame) -> list[tuple[str, str]]:
-    """The metrics the yield map actually has a figure for."""
+def metric_options(data, devices: list[str]) -> list[tuple[str, str]]:
+    """The metrics the yield map actually has a figure for.
+
+    A present column is not enough: the yield map also needs per-device values,
+    and some parameters have none for a given dataset. Offering a metric the
+    yield map cannot show would give the tile a rule with nothing behind it.
+    """
     import fig_yield
 
-    return [
-        (column, label)
-        for column, label, _is_log, _op in fig_yield.METRICS
-        if column in box_table.columns
-    ]
+    options = []
+    for column, label, _is_log, _op in fig_yield.METRICS:
+        if column not in data.box_table.columns:
+            continue
+        if fig_yield.device_medians(data.box_table, data.stack_id, devices, column):
+            options.append((column, label))
+    return options
 
 
 def build_stack_summary(
@@ -202,7 +209,7 @@ def build_stack_summary(
         rows=sorted({c.row for c in cells}),
         cols=sorted({c.col for c in cells}),
         cells=cells,
-        options=metric_options(data.box_table),
+        options=metric_options(data, devices),
         user_set=user_set,
         operator=operator,
         threshold=threshold,

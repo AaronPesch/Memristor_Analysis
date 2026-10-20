@@ -85,6 +85,8 @@ class StackSummary:
     rows: list[str]
     cols: list[int]
     cells: list[MapCell]
+    options: list[tuple[str, str]]
+    user_set: bool
     operator: str
     threshold: float
     passed: int
@@ -122,24 +124,55 @@ def _viridis(position: float) -> str:
     return "#fde725"
 
 
-def build_stack_summary(data, devices: list[str]) -> StackSummary | None:
+def metric_options(box_table: pd.DataFrame) -> list[tuple[str, str]]:
+    """The metrics the yield map actually has a figure for."""
+    import fig_yield
+
+    return [
+        (column, label)
+        for column, label, _is_log, _op in fig_yield.METRICS
+        if column in box_table.columns
+    ]
+
+
+def build_stack_summary(
+    data,
+    devices: list[str],
+    metric: str | None = None,
+    operator: str | None = None,
+    threshold: float | None = None,
+    user_set: bool = False,
+) -> StackSummary | None:
     """Per-device medians placed on the grid, coloured and scored.
+
+    `operator` and `threshold` are normally handed in from the yield map, so the
+    overview tile mirrors whatever the user set there rather than inventing its
+    own rule. Left out, the metric's own default applies -- the median across
+    devices, same as the yield map starts with.
 
     Reuses fig_yield rather than recomputing: the thumbnail and the full yield
     map must never disagree about which devices pass.
     """
     import fig_yield
 
-    metric, label, is_log, operator = fig_yield.METRICS[0]  # Memory Window
+    chosen = metric or fig_yield.METRICS[0][0]
+    entry = next((m for m in fig_yield.METRICS if m[0] == chosen), None)
+    if entry is None:
+        return None
+    metric, label, is_log, default_operator = entry
     if metric not in data.box_table.columns:
         return None
+    operator = operator or default_operator
 
     values = fig_yield.device_medians(data.box_table, data.stack_id, devices, metric)
     placed = {d: m.groups() for d in values if (m := DEVICE_RE.match(d))}
     if len(placed) < 2:
         return None
 
-    threshold = fig_yield.default_threshold(values)
+    # user_set says whether somebody changed the rule in the yield map, or it is
+    # still that metric's default (the median across devices).
+    if threshold is None:
+        threshold = fig_yield.default_threshold(values)
     scale = (
         [np.log10(v) for v in values.values() if v > 0]
         if is_log
@@ -169,6 +202,8 @@ def build_stack_summary(data, devices: list[str]) -> StackSummary | None:
         rows=sorted({c.row for c in cells}),
         cols=sorted({c.col for c in cells}),
         cells=cells,
+        options=metric_options(data.box_table),
+        user_set=user_set,
         operator=operator,
         threshold=threshold,
         passed=sum(1 for c in cells if c.passed),

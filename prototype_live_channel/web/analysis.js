@@ -47,6 +47,13 @@ function showHtml(payload) {
       send({ kind: "goto", category: button.dataset.goto })
     );
   }
+  // Which metric the map and the yield tile show. The threshold comes from the
+  // yield map, so switching here picks up whatever was set there.
+  for (const picker of panel.querySelectorAll("select[data-metric]")) {
+    picker.addEventListener("change", () =>
+      send({ kind: "overview_metric", metric: picker.value })
+    );
+  }
 }
 
 function show(payload) {

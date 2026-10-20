@@ -121,6 +121,8 @@ class Bridge(QObject):
                 self.window.selection ^= {device}
         elif kind == "clear_selection":
             self.window.selection = set()
+        elif kind == "overview_metric":
+            self.window.set_overview_metric(request.get("metric"))
         elif kind == "goto":
             # Overview acts as a hub: jump straight to the matching plot tab.
             self.window.goto_category(request.get("category"))

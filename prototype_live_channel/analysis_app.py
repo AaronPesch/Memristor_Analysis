@@ -48,6 +48,7 @@ from PySide6.QtWidgets import (  # noqa: E402
 )
 
 import channel  # noqa: E402
+import dashboard_data  # noqa: E402
 import dashboard_view  # noqa: E402
 import drilldown  # noqa: E402
 import exporters  # noqa: E402
@@ -78,6 +79,7 @@ class AnalysisWindow(QMainWindow):
         self.device_filter: list[str] | None = None
         self.drill: tuple | None = None
         self.overview = None
+        self.overview_metric: str | None = None
         self._owner_cache: dict[str, list] = {}
         self.mode: Mode | None = None
         self.dark = preferences.get_theme() == "dark"
@@ -306,6 +308,9 @@ class AnalysisWindow(QMainWindow):
 
         category = self.category
         if category is not None and category.key == OVERVIEW_KEY:
+            # Rebuilt on every render, so the tile reflects whatever the user
+            # last set in the yield map instead of a snapshot from import time.
+            self._refresh_overview_stack()
             return {
                 "key": OVERVIEW_KEY,
                 "theme": theme,
@@ -457,6 +462,43 @@ class AnalysisWindow(QMainWindow):
             worst = overview.worst_severity
             message += f" | {len(overview.findings)} data check(s): {worst}"
         self.statusBar().showMessage(message)
+
+    # ---- overview state -----------------------------------------------------
+
+    def _yield_state(self, metric: str) -> dict:
+        """The operator and threshold currently set in the yield map.
+
+        Read off the figure's own meta, which `on_yield_changed` rewrites, so
+        the overview cannot drift from what the yield tab shows.
+        """
+        for category in self.categories:
+            if not category.key.startswith("yield"):
+                continue
+            fig = category.figures.get(f"yield_{metric}")
+            if fig is not None:
+                return dict((fig.layout.meta or {}).get("yield") or {})
+        return {}
+
+    def _refresh_overview_stack(self) -> None:
+        if self.overview is None or self.data is None:
+            return
+        metric = self.overview_metric or fig_yield.METRICS[0][0]
+        state = self._yield_state(metric)
+        devices = self.device_filter or self.data.devices
+        summary = dashboard_data.build_stack_summary(
+            self.data,
+            devices,
+            metric=metric,
+            operator=state.get("operator"),
+            threshold=state.get("threshold"),
+            user_set=bool(state.get("user_set")),
+        )
+        if summary is not None:
+            self.overview.stack = summary
+
+    def set_overview_metric(self, metric: str | None) -> None:
+        if metric:
+            self.overview_metric = metric
 
     def goto_category(self, key: str | None) -> None:
         """Select a plot category by key -- the overview's jump-off links."""
@@ -647,8 +689,16 @@ class AnalysisWindow(QMainWindow):
         )
         if rebuilt is None:
             return
+
+        # Mark the rule as deliberately chosen, so the overview can say whether
+        # its tile shows a default or something somebody set here.
+        meta = dict(rebuilt.layout.meta or {})
+        info = dict(meta.get("yield") or {})
+        info["user_set"] = True
+        meta["yield"] = info
+        rebuilt.update_layout(meta=meta)
+
         category.figures[param_id] = rebuilt
-        info = rebuilt.layout.meta["yield"]
         self.statusBar().showMessage(
             f"{info['label']} {info['operator']} {info['threshold']:.4g} -> "
             f"{info['passed']}/{info['tested']} pass ({info['percent']:.1f} %)"

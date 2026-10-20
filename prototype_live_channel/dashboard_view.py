@@ -107,12 +107,23 @@ def _stack_block(stack, muted: str) -> str:
             )
         body += "</tr>"
 
+    choices = "".join(
+        f'<option value="{html.escape(column)}"'
+        f"{' selected' if column == stack.metric else ''}>{html.escape(label)}</option>"
+        for column, label in stack.options
+    )
+    source = (
+        "threshold set in the yield map"
+        if stack.user_set
+        else "default threshold (median across devices) — adjust it in the yield map"
+    )
+
     return f"""
   <h2>Stack at a glance</h2>
   <div class="stack-row">
     <div class="map-card">
       <div class="card-head">
-        <span>{html.escape(stack.label)} by position</span>
+        <span>Metric <select class="picker" data-metric>{choices}</select></span>
         <button class="link" data-goto="spatial_maps_stack_level">Open stack map →</button>
       </div>
       <table class="minimap">
@@ -130,8 +141,7 @@ def _stack_block(stack, muted: str) -> str:
       <div class="yield-sub">{stack.passed} of {stack.tested} devices</div>
       <div class="yield-rule">{html.escape(stack.label)} {html.escape(stack.operator)}
         {stack.threshold:.4g}</div>
-      <div class="hint" style="color:{muted}">Threshold = median across all devices;
-        adjustable in the yield map</div>
+      <div class="hint" style="color:{muted}">{html.escape(source)}</div>
     </div>
   </div>"""
 
@@ -211,6 +221,9 @@ def render(overview: Overview, dark: bool) -> str:
                 letter-spacing: .05em; }}
   .link {{ background: none; border: none; color: #4c8dff; cursor: pointer;
            font: inherit; text-transform: none; letter-spacing: 0; padding: 0; }}
+  .picker {{ background: {bg}; color: {text}; border: 1px solid {border};
+             border-radius: 4px; padding: 1px 4px; font: inherit;
+             text-transform: none; letter-spacing: 0; margin-left: 4px; }}
   .link:hover {{ text-decoration: underline; }}
   .minimap {{ border-collapse: separate; border-spacing: 2px; width: auto; }}
   .minimap th {{ color: {muted}; font-size: 10px; padding: 0 2px; border: none;

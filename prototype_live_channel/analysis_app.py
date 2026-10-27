@@ -60,7 +60,7 @@ from app.core import preferences  # noqa: E402
 from app.core.modes import Mode  # noqa: E402
 from app.core.theme import DARK, LIGHT, apply_qt_theme  # noqa: E402
 
-WEB_DIR = HERE / "web"
+WEB_DIR = channel.web_root()
 OVERVIEW_KEY = "overview"
 WIKI_URL = "https://github.com/AaronPesch/Memristor_Analysis/wiki"
 WELCOME = (
@@ -98,7 +98,9 @@ class AnalysisWindow(QMainWindow):
         web_channel = QWebChannel(self.view.page())
         web_channel.registerObject("bridge", self.bridge)
         self.view.page().setWebChannel(web_channel)
-        self.view.load(QUrl.fromLocalFile(str((WEB_DIR / "analysis.html").resolve())))
+        self.view.load(
+            QUrl.fromLocalFile(str((channel.web_root() / "analysis.html").resolve()))
+        )
 
     # ---- construction -------------------------------------------------------
 

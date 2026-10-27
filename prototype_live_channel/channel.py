@@ -8,6 +8,7 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import sys
 import traceback
 from pathlib import Path
 
@@ -17,7 +18,7 @@ from PySide6.QtCore import QFile, QIODevice, QObject, Signal, Slot
 from app.converter.batch import BatchConverter
 from app.converter.convert_path_to_glob import path_to_glob
 from app.core.modes import Mode
-from app.core.paths import DB_FILE
+from app.core.paths import APP_DATA_PATH, DB_FILE
 from app.core.theme import DARK, LIGHT, PLOT_COLORS
 from app.plotting.config import Config
 
@@ -25,21 +26,53 @@ import dashboard_data
 import live_pipeline
 
 HERE = Path(__file__).parent
-WEB_DIR = HERE / "web"
+PAGE_FILES = ("analysis.html", "analysis.js")
+
+
+def bundle_web() -> Path:
+    """Where PyInstaller put the page files, or the source folder."""
+    return Path(getattr(sys, "_MEIPASS", HERE)) / "web"
+
+
+def web_root() -> Path:
+    """The directory the page is actually served from.
+
+    Running from a checkout this is the source folder, so an edit to the page
+    takes effect on the next start. Frozen, the bundle is the wrong place to
+    write into -- plotly.js and qwebchannel.js have to land somewhere -- so the
+    page is assembled in the app-data folder instead.
+    """
+    if getattr(sys, "frozen", False):
+        return APP_DATA_PATH / "web"
+    return HERE / "web"
+
+
+# Kept as a module attribute for callers that read it directly.
+WEB_DIR = web_root()
 
 
 def export_static_assets() -> None:
-    """plotly.js and qwebchannel.js come out of the installed packages.
+    """Assemble the page: plotly.js and qwebchannel.js out of the installed
+    packages, plus the page files themselves when running frozen.
 
     The app is therefore fully offline, and the plotly.js version always matches
     the plotly.py that built the figures -- a CDN pin cannot drift out of sync.
     """
+    target = web_root()
+    target.mkdir(parents=True, exist_ok=True)
+
+    if getattr(sys, "frozen", False):
+        for name in PAGE_FILES:
+            source = bundle_web() / name
+            if source.exists():
+                (target / name).write_bytes(source.read_bytes())
+
     bundled = Path(plotly.__file__).parent / "package_data" / "plotly.min.js"
     if bundled.exists():
-        (WEB_DIR / "plotly.min.js").write_bytes(bundled.read_bytes())
+        (target / "plotly.min.js").write_bytes(bundled.read_bytes())
     resource = QFile(":/qtwebchannel/qwebchannel.js")
     if resource.open(QIODevice.OpenModeFlag.ReadOnly):
-        (WEB_DIR / "qwebchannel.js").write_bytes(bytes(resource.readAll()))
+        (target / "qwebchannel.js").write_bytes(bytes(resource.readAll()))
         resource.close()
 
 

@@ -1,0 +1,124 @@
+name: Build Windows Executable (Prototype)
+
+# Packages prototype_live_channel/analysis_app.py, the live-channel prototype.
+# The existing "Build Windows Executable" workflow builds src/app/main.py and is
+# left untouched -- run that one for the shipping application.
+
+on:
+  # Allows you to run this workflow manually from the Actions tab.
+  # Pick the Prototype-v3 branch there; main does not contain the prototype.
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Fail early if the prototype is missing
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "prototype_live_channel\analysis_app.py")) {
+            Write-Error "This ref has no prototype_live_channel/. Re-run on Prototype-v3."
+            exit 1
+          }
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies from Requirements
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          if (Test-Path requirements.txt) {
+            pip install -r requirements.txt
+          } else {
+            Write-Error "requirements.txt not found!"
+            exit 1
+          }
+
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller --noconfirm --onedir --windowed --clean `
+            --name "MemristorPrototype" `
+            --log-level WARN `
+            --collect-all PySide6 `
+            --collect-all plotly `
+            --collect-all duckdb `
+            --collect-all polars `
+            --collect-all svglib `
+            --collect-all pptx `
+            --collect-data kaleido `
+            --hidden-import kaleido `
+            --exclude-module kaleido.mocker `
+            --add-data "prototype_live_channel/web;web" `
+            --paths "src" `
+            --paths "prototype_live_channel" `
+            "prototype_live_channel\analysis_app.py"
+
+      # Notes on the flags above, all of them learned the hard way:
+      #
+      # --collect-all kaleido breaks the build. It makes PyInstaller import
+      #   kaleido.mocker._args, which calls parse_args() at import time and
+      #   chokes on PyInstaller's own command line. Collecting only its data
+      #   and excluding that module works. The same flag sits in
+      #   build_windows.yml and is likely broken there too.
+      # --collect-all pptx is needed for the PowerPoint export; the package is
+      #   imported as `pptx`, not `python-pptx`.
+      # --add-data ships web/analysis.html and web/analysis.js. At startup the
+      #   app copies them, plotly.min.js and qwebchannel.js into
+      #   %LOCALAPPDATA%\MemristorAnalysisTool\web and serves the page from
+      #   there -- a frozen bundle is the wrong place to write into.
+      # Two --paths entries: src for the app package, prototype_live_channel
+      #   for channel/drilldown/dashboard_* and friends.
+      # matplotlib is deliberately not collected; the prototype never imports it.
+
+      - name: Archive Production Artifact
+        run: |
+          Compress-Archive -Path dist\MemristorPrototype -DestinationPath MemristorPrototype_Windows.zip
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MemristorPrototype-Windows-Build
+          path: MemristorPrototype_Windows.zip
+          retention-days: 5
+
+      - name: Run Smoke Test
+        shell: pwsh
+        run: |
+          Write-Host "Starting built executable for smoke test..."
+          $exePath = "dist\MemristorPrototype\MemristorPrototype.exe"
+          $process = Start-Process -FilePath $exePath -ArgumentList "--smoke-test" `
+            -PassThru -NoNewWindow -ErrorAction Stop
+
+          Start-Sleep -Seconds 20
+
+          if ($process.HasExited) {
+            if ($process.ExitCode -ne 0) {
+              Write-Error "SMOKE TEST FAILED: exit code $($process.ExitCode)"
+              exit 1
+            }
+            Write-Host "Smoke test passed: initialized and exited cleanly."
+          } else {
+            Write-Host "Smoke test passed: still running (forcing shutdown)."
+            Stop-Process -Id $process.Id -Force
+          }
+
+      - name: Check the page was assembled
+        shell: pwsh
+        run: |
+          # --smoke-test builds the window, so the page must have been written.
+          $web = Join-Path $env:LOCALAPPDATA "MemristorAnalysisTool\web"
+          foreach ($name in @("analysis.html", "analysis.js", "plotly.min.js", "qwebchannel.js")) {
+            $file = Join-Path $web $name
+            if (-not (Test-Path $file)) {
+              Write-Error "Missing from the assembled page: $name"
+              exit 1
+            }
+            Write-Host "$name  $((Get-Item $file).Length) bytes"
+          }

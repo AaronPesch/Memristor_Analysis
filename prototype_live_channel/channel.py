@@ -8,6 +8,7 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import re
 import sys
 import traceback
 from pathlib import Path
@@ -173,6 +174,61 @@ class Bridge(QObject):
         self.figureChanged.emit(json.dumps(self.window.current_payload()))
 
 
+_OUTCOME = re.compile(
+    r"^\[\d+/\d+\]\s+(?P<name>.+?):\s+(?P<outcome>.+?)(?:\s+\([\d.]+s\))?$"
+)
+
+
+def diagnose_import(log: str) -> str:
+    """Turn the converter's per-file output into something actionable.
+
+    `BatchConverter` prints one line per file -- so many rows, `metadata only`,
+    or `ERROR`. Which of the two usual causes of an empty database applies is
+    visible only there, so the distinction has to reach the user.
+    """
+    rows = metadata = errors = 0
+    failures: list[str] = []
+    for line in log.splitlines():
+        match = _OUTCOME.match(line.strip())
+        if not match:
+            continue
+        outcome = match.group("outcome")
+        if outcome.startswith("ERROR"):
+            errors += 1
+            failures.append(f"{match.group('name')}: {outcome}")
+        elif "metadata only" in outcome:
+            metadata += 1
+        else:
+            rows += 1
+
+    total = rows + metadata + errors
+    if total == 0:
+        return ""
+
+    lines = [
+        f"{total} file(s) read: {rows} with cycle data, "
+        f"{metadata} metadata only, {errors} unreadable."
+    ]
+    if rows == 0 and metadata:
+        lines.append(
+            "No file contained sheets named Run1, Run2, ... Those hold the cycle "
+            "data; everything else becomes a metadata table. This usually means "
+            "the selected folder is not the one holding the measurements - for a "
+            "device import, pick the folder with the .xlsx files in it."
+        )
+    if errors:
+        lines.append(
+            "Files that could not be read at all are often present but not "
+            "actually downloaded - OneDrive and similar keep placeholders that "
+            "look like normal files. Right-click the folder and choose "
+            "'Always keep on this device', then import again."
+        )
+        lines.extend("  " + failure for failure in failures[:5])
+        if len(failures) > 5:
+            lines.append(f"  ... and {len(failures) - 5} more")
+    return "\n".join(lines)
+
+
 class ImportWorker(QObject):
     """Import and figure build on a worker thread, so the UI stays responsive.
 
@@ -193,16 +249,16 @@ class ImportWorker(QObject):
 
     @Slot()
     def run(self) -> None:
+        # Declared before the try so the failure path can still report it.
+        log = io.StringIO()
         try:
             self.status.emit("Phase 1/3: importing Excel files into DuckDB...")
             self.progress.emit(5)
             # BatchConverter collects per-file warnings and prints them; convert()
             # returns only the database path, so capturing stdout is the only way
             # to get them in front of the user without changing the converter.
-            log = io.StringIO()
             with contextlib.redirect_stdout(log):
                 BatchConverter(DB_FILE).convert(path_to_glob(self.path, self.mode))
-            print(log.getvalue(), end="")
 
             self.progress.emit(50)
             self.status.emit("Phase 2/3: building figures...")
@@ -219,4 +275,18 @@ class ImportWorker(QObject):
             self.progress.emit(100)
             self.finished.emit(data, categories, overview)
         except Exception as exc:
-            self.failed.emit(f"{exc}\n\n{traceback.format_exc()}")
+            # The per-file outcomes are what actually explains an empty
+            # database; the traceback only says that it was empty. A packaged
+            # build has no console, so this dialog is the only place they show.
+            report = [str(exc)]
+            diagnosis = diagnose_import(log.getvalue())
+            if diagnosis:
+                report += ["", "What the import produced:", diagnosis]
+            if log.getvalue().strip():
+                report += ["", "Import log:", log.getvalue().rstrip()]
+            report += ["", traceback.format_exc()]
+            self.failed.emit("\n".join(report))
+        finally:
+            # Echo the converter output either way, for anyone with a console.
+            if log.getvalue():
+                print(log.getvalue(), end="")

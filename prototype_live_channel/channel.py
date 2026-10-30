@@ -229,6 +229,54 @@ def diagnose_import(log: str) -> str:
     return "\n".join(lines)
 
 
+def diagnose_selection(path: Path, mode: Mode) -> str:
+    """Explain a folder that yielded no files at all.
+
+    `BatchConverter` reports the glob it tried and nothing else, so a folder
+    holding the device folders one level down looks the same as a folder holding
+    a holiday calendar. What is actually in there is the useful part.
+    """
+    if not path.exists():
+        return f"{path} does not exist any more."
+    if not path.is_dir():
+        return f"{path} is a file, not a folder."
+
+    direct = [p for p in path.glob("*.xlsx") if not p.name.startswith("~$")]
+    nested = [
+        p
+        for p in path.rglob("*.xlsx")
+        if not p.name.startswith("~$") and p.parent != path
+    ]
+    folders = [p for p in path.iterdir() if p.is_dir()]
+    others = [p for p in path.iterdir() if p.is_file() and p.suffix.lower() != ".xlsx"]
+
+    lines = [
+        f"'{path.name}' holds {len(direct)} .xlsx file(s) directly, "
+        f"{len(nested)} in subfolders, {len(folders)} subfolder(s) "
+        f"and {len(others)} other file(s)."
+    ]
+
+    if nested and mode is Mode.DEVICE:
+        # By far the most common mistake: the stack folder picked for a device
+        # import, which only ever looks at the top level.
+        example = sorted({p.parent.name for p in nested})[:4]
+        lines.append(
+            f"The .xlsx files sit one level down, in {', '.join(example)}"
+            f"{' and others' if len(example) < len({p.parent.name for p in nested}) else ''}. "
+            "That is the layout a Stack import expects - use Ctrl+Shift+O, or "
+            "pick one of those folders for a device import."
+        )
+    elif not direct and not nested:
+        lines.append(
+            "There are no Excel files anywhere below this folder. A device "
+            "import expects the folder holding the .xlsx files; a stack import "
+            "expects the folder holding the device folders."
+        )
+        if others:
+            lines.extend("  " + p.name for p in others[:5])
+    return "\n".join(lines)
+
+
 class ImportWorker(QObject):
     """Import and figure build on a worker thread, so the UI stays responsive.
 
@@ -279,9 +327,15 @@ class ImportWorker(QObject):
             # database; the traceback only says that it was empty. A packaged
             # build has no console, so this dialog is the only place they show.
             report = [str(exc)]
+            # If files were read, explain what they produced; if none were, the
+            # folder itself is what needs explaining.
             diagnosis = diagnose_import(log.getvalue())
+            heading = "What the import produced:"
+            if not diagnosis:
+                diagnosis = diagnose_selection(self.path, self.mode)
+                heading = "What the selected folder contains:"
             if diagnosis:
-                report += ["", "What the import produced:", diagnosis]
+                report += ["", heading, diagnosis]
             if log.getvalue().strip():
                 report += ["", "Import log:", log.getvalue().rstrip()]
             report += ["", traceback.format_exc()]

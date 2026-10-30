@@ -119,3 +119,80 @@ def test_the_first_line_is_the_headline(
 
     assert reports[0].splitlines()[0].strip()
     assert "Traceback" not in reports[0].splitlines()[0]
+
+
+# ── when nothing was found at all ────────────────────────────────────────────
+
+
+def test_a_folder_with_no_spreadsheets_lists_what_is_there(tmp_path):
+    folder = tmp_path / "D12"
+    folder.mkdir()
+    (folder / "calendar.pdf").write_bytes(b"%PDF-1.4")
+
+    text = channel.diagnose_selection(folder, Mode.DEVICE)
+    assert "0 .xlsx file(s) directly" in text
+    assert "no Excel files anywhere below" in text
+    assert "calendar.pdf" in text
+
+
+def test_a_stack_folder_picked_for_a_device_import_says_so(tmp_path):
+    """The most common mistake: a device import only looks at the top level."""
+    stack = tmp_path / "STACK#1"
+    for device in ("A1", "A2"):
+        (stack / device).mkdir(parents=True)
+        (stack / device / "03 endurance set.xlsx").write_bytes(b"x")
+
+    text = channel.diagnose_selection(stack, Mode.DEVICE)
+    assert "2 in subfolders" in text
+    assert "Ctrl+Shift+O" in text
+    assert "A1" in text and "A2" in text
+
+
+def test_a_correct_device_folder_gets_no_complaint(tmp_path):
+    folder = tmp_path / "A1"
+    folder.mkdir()
+    (folder / "03 endurance set.xlsx").write_bytes(b"x")
+
+    text = channel.diagnose_selection(folder, Mode.DEVICE)
+    assert "1 .xlsx file(s) directly" in text
+    assert "no Excel files anywhere" not in text
+    assert "Ctrl+Shift+O" not in text
+
+
+def test_temporary_excel_files_are_not_counted(tmp_path):
+    folder = tmp_path / "A1"
+    folder.mkdir()
+    (folder / "~$03 endurance set.xlsx").write_bytes(b"x")
+
+    text = channel.diagnose_selection(folder, Mode.DEVICE)
+    assert "0 .xlsx file(s) directly" in text
+
+
+def test_a_vanished_or_wrong_path_is_named(tmp_path):
+    assert "does not exist" in channel.diagnose_selection(tmp_path / "gone", Mode.STACK)
+
+    a_file = tmp_path / "sheet.xlsx"
+    a_file.write_bytes(b"x")
+    assert "is a file, not a folder" in channel.diagnose_selection(a_file, Mode.DEVICE)
+
+
+def test_the_report_falls_back_to_the_folder_when_nothing_was_read(
+    tmp_path, monkeypatch
+):
+    """No files found means no per-file log, so the folder is what gets
+    explained -- this is the 'No Excel files found matching' case."""
+    folder = tmp_path / "D12"
+    folder.mkdir()
+    (folder / "calendar.pdf").write_bytes(b"%PDF-1.4")
+    monkeypatch.setattr(channel, "DB_FILE", tmp_path / "empty.duckdb")
+
+    worker = channel.ImportWorker(folder, Mode.DEVICE)
+    reports: list[str] = []
+    worker.failed.connect(reports.append)
+    worker.run()
+
+    report = reports[0]
+    assert "No Excel files found matching" in report
+    assert "What the selected folder contains:" in report
+    assert "calendar.pdf" in report
+    assert "What the import produced:" not in report

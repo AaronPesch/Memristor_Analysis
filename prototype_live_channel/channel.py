@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import contextlib
 import io
+
+import duckdb
 import json
 import re
 import sys
@@ -242,6 +244,31 @@ def diagnose_import(log: str) -> str:
     return "\n".join(lines)
 
 
+def rows_from(db: Path, folder: Path) -> tuple[int, int]:
+    """(rows contributed by `folder`, rows in the table overall).
+
+    BatchConverter replaces the cycles table only when at least one file yielded
+    data -- the DROP sits inside that branch. An import where nothing parsed
+    therefore leaves the previous import's table untouched, load_all finds it,
+    and the app reports success while showing the earlier measurements. Counting
+    what actually came from the selected folder is what catches that.
+    """
+    if not db.exists():
+        return 0, 0
+    with duckdb.connect(str(db), read_only=True) as conn:
+        present = conn.execute(
+            "SELECT count(*) FROM information_schema.tables WHERE table_name = 'cycles'"
+        ).fetchone()[0]
+        if not present:
+            return 0, 0
+        total = conn.execute("SELECT count(*) FROM cycles").fetchone()[0]
+        mine = conn.execute(
+            "SELECT count(*) FROM cycles WHERE starts_with(lower(file_path), lower(?))",
+            [str(folder.resolve())],
+        ).fetchone()[0]
+    return mine, total
+
+
 def diagnose_selection(path: Path, mode: Mode) -> str:
     """Explain a folder that yielded no files at all.
 
@@ -320,6 +347,21 @@ class ImportWorker(QObject):
             # to get them in front of the user without changing the converter.
             with contextlib.redirect_stdout(log):
                 BatchConverter(DB_FILE).convert(path_to_glob(self.path, self.mode))
+
+            # Refuse to carry on with somebody else's data. Without this the
+            # app reports success and plots the previous import.
+            mine, total = rows_from(DB_FILE, self.path)
+            if mine == 0:
+                stale = (
+                    f" The database still holds {total:,} rows from an earlier "
+                    "import, which is what the plots would have shown."
+                    if total
+                    else ""
+                )
+                raise RuntimeError(
+                    "This import added no measurement data from the selected "
+                    f"folder.{stale}"
+                )
 
             self.progress.emit(50)
             self.status.emit("Phase 2/3: building figures...")

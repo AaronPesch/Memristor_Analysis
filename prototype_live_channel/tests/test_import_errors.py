@@ -8,6 +8,8 @@ failure path, which left a report stating the symptom and nothing else.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 import xlsxwriter
 
@@ -97,8 +99,9 @@ def test_the_failure_report_explains_itself(
     assert len(reports) == 1, reports
     report = reports[0]
 
-    # The symptom, as before.
-    assert "contains no data" in report
+    # The guard in the worker reports this before load_all gets to complain
+    # about an empty database, and says it in terms of the selected folder.
+    assert "added no measurement data from the selected folder" in report
     # What is new: the cause, the evidence, and the traceback, in that order.
     assert "What the import produced:" in report
     assert "0 with cycle data, 1 metadata only" in report
@@ -246,3 +249,98 @@ def test_a_mixed_import_separates_the_two():
     text = channel.diagnose_import(log)
     assert "3 file(s) read: 0 with cycle data, 1 metadata only, 2 unreadable" in text
     assert "OneDrive" in text and "Run1, Run2" in text
+
+
+# ── an import that contributes nothing must not pass off older data ──────────
+
+
+def _valid_device(tmp_path, name="A1"):
+    """A device folder the importer accepts, via the fixture generator."""
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
+    import numpy as np
+
+    import make_fixtures
+
+    staging = tmp_path / f"staging_{name}"
+    make_fixtures.build_device(
+        staging, name[0], int(name[1:]), 4, np.random.default_rng(3)
+    )
+    return staging / make_fixtures.STACK_ID / name
+
+
+def test_rows_from_counts_only_the_selected_folder(tmp_path, monkeypatch):
+    device = _valid_device(tmp_path)
+    db = tmp_path / "db.duckdb"
+    monkeypatch.setattr(channel, "DB_FILE", db)
+
+    worker = channel.ImportWorker(device, Mode.DEVICE)
+    worker.run()
+
+    mine, total = channel.rows_from(db, device)
+    assert mine > 0 and mine == total
+
+    elsewhere, still_total = channel.rows_from(db, tmp_path / "somewhere_else")
+    assert elsewhere == 0
+    assert still_total == total
+
+
+def test_rows_from_handles_a_database_that_is_not_there(tmp_path):
+    assert channel.rows_from(tmp_path / "nope.duckdb", tmp_path) == (0, 0)
+
+
+def test_a_second_import_that_parses_nothing_is_refused(tmp_path, monkeypatch):
+    """The regression this guards: BatchConverter only replaces the cycles
+    table when something parsed, so an import where nothing did leaves the
+    previous one in place. The app then reported success and plotted the older
+    measurements."""
+    db = tmp_path / "db.duckdb"
+    monkeypatch.setattr(channel, "DB_FILE", db)
+
+    device = _valid_device(tmp_path)
+    first = channel.ImportWorker(device, Mode.DEVICE)
+    outcomes: list[str] = []
+    first.finished.connect(lambda *_: outcomes.append("ok"))
+    first.failed.connect(lambda m: outcomes.append("failed: " + m))
+    first.run()
+    assert outcomes == ["ok"], outcomes
+    before, _ = channel.rows_from(db, device)
+    assert before > 0
+
+    empty = tmp_path / "nothing_useful"
+    empty.mkdir()
+    book = xlsxwriter.Workbook(str(empty / "01 notes.xlsx"))
+    book.add_worksheet("Tabelle1").write(0, 0, "x")
+    book.close()
+
+    second = channel.ImportWorker(empty, Mode.DEVICE)
+    reports: list[str] = []
+    second.failed.connect(reports.append)
+    second.finished.connect(lambda *_: reports.append("UNEXPECTED SUCCESS"))
+    second.run()
+
+    assert len(reports) == 1 and "UNEXPECTED SUCCESS" not in reports[0]
+    assert "added no measurement data" in reports[0]
+    assert "earlier import" in reports[0], "say that the old data is still loaded"
+    # The old rows are still there -- that is the point; they are just not
+    # presented as the new import.
+    assert channel.rows_from(db, device)[0] == before
+
+
+def test_a_good_import_replaces_the_previous_one(tmp_path, monkeypatch):
+    db = tmp_path / "db.duckdb"
+    monkeypatch.setattr(channel, "DB_FILE", db)
+
+    first = _valid_device(tmp_path, "A1")
+    channel.ImportWorker(first, Mode.DEVICE).run()
+    second = _valid_device(tmp_path, "B2")
+    worker = channel.ImportWorker(second, Mode.DEVICE)
+    outcomes: list[str] = []
+    worker.finished.connect(lambda *_: outcomes.append("ok"))
+    worker.failed.connect(lambda m: outcomes.append("failed: " + m.splitlines()[0]))
+    worker.run()
+
+    assert outcomes == ["ok"], outcomes
+    assert channel.rows_from(db, second)[0] > 0
+    assert channel.rows_from(db, first)[0] == 0, "the earlier import is gone"

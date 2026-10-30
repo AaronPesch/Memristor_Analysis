@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import multiprocessing
 import sys
 from pathlib import Path
 
@@ -977,6 +978,44 @@ def pretty_label(param_id: str) -> str:
     return param_id.replace("_vs_", " vs ").replace("_", " ")
 
 
+def run_import_test(folder: Path, stack: bool) -> int:
+    """Import one folder head-on and say what came of it.
+
+    No window, no dialog. Exists because a packaged build can open its window
+    perfectly and still be unable to import anything: the converter's worker
+    processes are started by re-launching the executable, and that only works
+    with multiprocessing.freeze_support() in place. A smoke test that merely
+    builds the UI never notices.
+    """
+    mode = Mode.STACK if stack else Mode.DEVICE
+    print(f"Importing {folder} as {mode.value} ...")
+
+    worker = channel.ImportWorker(folder, mode)
+    outcome: list[tuple[str, object]] = []
+    worker.finished.connect(
+        lambda data, categories, overview: outcome.append(("ok", (data, categories)))
+    )
+    worker.failed.connect(lambda message: outcome.append(("failed", message)))
+    worker.run()
+
+    if not outcome:
+        print("IMPORT TEST FAILED: the worker reported nothing at all")
+        return 1
+    status, payload = outcome[0]
+    if status == "failed":
+        print("IMPORT TEST FAILED")
+        print(payload)
+        return 1
+
+    data, categories = payload
+    figures = sum(len(c.figures) for c in categories)
+    print(
+        f"IMPORT TEST OK: stack {data.stack_id}, {len(data.devices)} device(s), "
+        f"{len(categories)} categories, {figures} figures"
+    )
+    return 0
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -984,7 +1023,25 @@ def main() -> None:
         action="store_true",
         help="build the window, then exit immediately (for CI)",
     )
+    parser.add_argument(
+        "--import-test",
+        metavar="FOLDER",
+        help=(
+            "import FOLDER without a file dialog, report the outcome and exit "
+            "non-zero on failure. --smoke-test only proves the window opens; "
+            "this proves an import actually runs, which in a frozen build is a "
+            "different question entirely."
+        ),
+    )
+    parser.add_argument(
+        "--stack",
+        action="store_true",
+        help="with --import-test: treat FOLDER as a stack rather than a device",
+    )
     args = parser.parse_args()
+
+    if args.import_test:
+        sys.exit(run_import_test(Path(args.import_test), args.stack))
 
     app = QApplication(sys.argv)
     # Before the window is built, so a restored dark session opens dark instead
@@ -1006,4 +1063,11 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    # Must come before anything else, and before QApplication in particular.
+    # BatchConverter uses a ProcessPoolExecutor, and on Windows those children
+    # are started by re-launching this executable. In a frozen build without
+    # this call they do not reach the worker function at all -- every file comes
+    # back as "A process in the process pool was terminated abruptly", so a
+    # packaged app can import nothing whatsoever. Harmless when run from source.
+    multiprocessing.freeze_support()
     main()

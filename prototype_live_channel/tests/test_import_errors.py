@@ -344,3 +344,38 @@ def test_a_good_import_replaces_the_previous_one(tmp_path, monkeypatch):
     assert outcomes == ["ok"], outcomes
     assert channel.rows_from(db, second)[0] > 0
     assert channel.rows_from(db, first)[0] == 0, "the earlier import is gone"
+
+
+# ── when the worker processes never ran ──────────────────────────────────────
+
+# What a frozen build without multiprocessing.freeze_support() produces. Every
+# file "fails", but nothing is wrong with any of them -- the processes that were
+# meant to read them were killed before reaching the worker function.
+POOL_DIED_LOG = r"""\
+[1/2] 00 Leakage.xlsx: ERROR - A process in the process pool was terminated \
+abruptly while the future was running or pending.
+[2/2] 02 reset.xlsx: ERROR - A process in the process pool was terminated \
+abruptly while the future was running or pending.
+Traceback (most recent call last):
+  File "multiprocessing\queues.py", line 246, in _feed
+OSError: handle is closed
+"""
+
+
+def test_a_dead_process_pool_is_not_blamed_on_the_files():
+    text = channel.diagnose_import(POOL_DIED_LOG)
+    assert "0 with cycle data, 0 metadata only, 2 unreadable" in text
+    assert "fault in the application, not in the data" in text
+    assert "OneDrive" not in text, "the files are fine; the workers never started"
+
+
+def test_a_dead_pool_suggests_running_from_source():
+    text = channel.diagnose_import(POOL_DIED_LOG)
+    assert "from source" in text
+
+
+def test_genuinely_unreadable_files_still_get_the_placeholder_hint():
+    """The two must not be conflated: same counts, different cause."""
+    text = channel.diagnose_import(UNREADABLE_LOG)
+    assert "OneDrive" in text
+    assert "fault in the application" not in text

@@ -109,6 +109,24 @@ jobs:
             Stop-Process -Id $process.Id -Force
           }
 
+      - name: Import test
+        shell: pwsh
+        run: |
+          # --smoke-test only proves the window opens. A frozen build can do
+          # that and still import nothing: the converter's worker processes are
+          # started by re-launching the executable, which needs
+          # multiprocessing.freeze_support(). Without it every file comes back
+          # as "process in the process pool was terminated abruptly", and only
+          # an actual import notices.
+          python prototype_live_channel\tools\make_fixtures.py "$env:RUNNER_TEMP\fixtures" --cycles 3
+          $stack = Join-Path $env:RUNNER_TEMP "fixtures\SC20251208#4a"
+
+          & "dist\MemristorPrototype\MemristorPrototype.exe" --import-test "$stack" --stack
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "The packaged build could not import the generated fixtures."
+            exit 1
+          }
+
       - name: Check the page was assembled
         shell: pwsh
         run: |

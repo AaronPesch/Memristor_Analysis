@@ -176,6 +176,9 @@ class Bridge(QObject):
         self.figureChanged.emit(json.dumps(self.window.current_payload()))
 
 
+_POOL_DIED = re.compile(
+    r"process in the process pool was terminated abruptly|handle is closed"
+)
 _UNOPENABLE = re.compile(r"Could not open workbook at (.+)$", re.MULTILINE)
 _OUTCOME = re.compile(
     r"^\[\d+/\d+\]\s+(?P<name>.+?):\s+(?P<outcome>.+?)(?:\s+\([\d.]+s\))?$"
@@ -231,7 +234,17 @@ def diagnose_import(log: str) -> str:
             "the selected folder is not the one holding the measurements - for a "
             "device import, pick the folder with the .xlsx files in it."
         )
-    if errors:
+    if errors and _POOL_DIED.search(log):
+        # Not a problem with the files at all: the worker processes never ran.
+        # On Windows those are started by re-launching the executable, which a
+        # frozen build only survives with multiprocessing.freeze_support().
+        lines.append(
+            "The worker processes that read the files were killed before they "
+            "could start, so no file was ever opened - this is a fault in the "
+            "application, not in the data. Running from source instead of the "
+            "packaged build is the workaround; please report it."
+        )
+    elif errors:
         lines.append(
             "Files that could not be read at all are often present but not "
             "actually downloaded - OneDrive and similar keep placeholders that "

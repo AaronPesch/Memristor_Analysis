@@ -196,3 +196,53 @@ def test_the_report_falls_back_to_the_folder_when_nothing_was_read(
     assert "What the selected folder contains:" in report
     assert "calendar.pdf" in report
     assert "What the import produced:" not in report
+
+
+# ── an unreadable file does not announce itself as an error ──────────────────
+
+# This is what the converter really prints for a file it cannot open: the
+# per-file line says "metadata only", because ExcelFileProcessor catches the
+# exception and the converter only sees zero rows. The cause appears at the end,
+# in the warnings block. Reading only the per-file lines gives the opposite
+# advice to the right one.
+UNREADABLE_LOG = r"""\
+[1/2] 03 endurance set.xlsx: metadata only (0.01s)
+[2/2] 04 endurance reset.xlsx: metadata only (0.01s)
+
+Warnings (2):
+  - Fatal error: calamine error: Xlsx error: Zip error: invalid Zip archive
+Context:
+    0: Could not open workbook at C:\data\A1\03 endurance set.xlsx
+    1: could not load excel file at C:\data\A1\03 endurance set.xlsx
+  - Fatal error: calamine error: Xlsx error: Zip error: invalid Zip archive
+Context:
+    0: Could not open workbook at C:\data\A1\04 endurance reset.xlsx
+    1: could not load excel file at C:\data\A1\04 endurance reset.xlsx
+"""
+
+
+def test_unreadable_files_are_not_counted_as_metadata():
+    text = channel.diagnose_import(UNREADABLE_LOG)
+    assert "0 with cycle data, 0 metadata only, 2 unreadable" in text
+
+
+def test_unreadable_files_get_the_placeholder_hint_not_the_folder_hint():
+    text = channel.diagnose_import(UNREADABLE_LOG)
+    assert "OneDrive" in text
+    assert "Run1, Run2" not in text, "this is not a wrong-folder problem"
+    assert "03 endurance set.xlsx: could not be opened" in text
+
+
+def test_a_real_metadata_only_file_still_gets_the_folder_hint():
+    """The same per-file line, without a warnings block behind it."""
+    text = channel.diagnose_import("[1/1] 01 notes.xlsx: metadata only (0.01s)")
+    assert "0 with cycle data, 1 metadata only, 0 unreadable" in text
+    assert "Run1, Run2" in text
+    assert "OneDrive" not in text
+
+
+def test_a_mixed_import_separates_the_two():
+    log = UNREADABLE_LOG + "[3/3] 01 notes.xlsx: metadata only (0.01s)\n"
+    text = channel.diagnose_import(log)
+    assert "3 file(s) read: 0 with cycle data, 1 metadata only, 2 unreadable" in text
+    assert "OneDrive" in text and "Run1, Run2" in text

@@ -174,6 +174,7 @@ class Bridge(QObject):
         self.figureChanged.emit(json.dumps(self.window.current_payload()))
 
 
+_UNOPENABLE = re.compile(r"Could not open workbook at (.+)$", re.MULTILINE)
 _OUTCOME = re.compile(
     r"^\[\d+/\d+\]\s+(?P<name>.+?):\s+(?P<outcome>.+?)(?:\s+\([\d.]+s\))?$"
 )
@@ -186,20 +187,32 @@ def diagnose_import(log: str) -> str:
     or `ERROR`. Which of the two usual causes of an empty database applies is
     visible only there, so the distinction has to reach the user.
     """
-    rows = metadata = errors = 0
+    # A file that cannot be opened is not reported as an error on its own line.
+    # ExcelFileProcessor catches the exception, so the converter sees zero rows
+    # and prints "metadata only"; the real cause only appears in the warnings
+    # block at the end. Without reading that, an unreadable file is
+    # indistinguishable from a spreadsheet that simply has no Run sheets -- and
+    # the advice for the two is opposite.
+    unreadable = {
+        Path(match.group(1).strip()).name for match in _UNOPENABLE.finditer(log)
+    }
+
+    rows = metadata = 0
     failures: list[str] = []
     for line in log.splitlines():
         match = _OUTCOME.match(line.strip())
         if not match:
             continue
-        outcome = match.group("outcome")
-        if outcome.startswith("ERROR"):
-            errors += 1
-            failures.append(f"{match.group('name')}: {outcome}")
+        name, outcome = match.group("name"), match.group("outcome")
+        if name in unreadable or outcome.startswith("ERROR"):
+            failures.append(
+                f"{name}: {'could not be opened' if name in unreadable else outcome}"
+            )
         elif "metadata only" in outcome:
             metadata += 1
         else:
             rows += 1
+    errors = len(failures)
 
     total = rows + metadata + errors
     if total == 0:

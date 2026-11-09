@@ -17,6 +17,8 @@ import duckdb
 import numpy as np
 import pandas as pd
 
+import coerce
+
 DEVICE_RE = re.compile(r"^([A-Za-z]+)(\d+)$")
 
 # (column, label, unit) -- the parameters worth a summary row.
@@ -460,11 +462,40 @@ def parse_import_warnings(log: str) -> list[Finding]:
     ]
 
 
+def findings_from_repairs(repairs) -> list[Finding]:
+    """Report the values `coerce.repair_cycles` had to drop.
+
+    Without this the repair would be silent, and a dropped measurement is
+    exactly the kind of thing that must not be. An unrepaired column is an
+    error because the plots using it will be empty.
+    """
+    findings = []
+    for report in repairs:
+        if not report.discarded:
+            continue
+        findings.append(
+            Finding(
+                severity="warning" if report.repaired else "error",
+                title=(
+                    f"{report.column}: {report.discarded:,} value(s) were not numbers"
+                ),
+                detail=coerce.describe(report),
+                devices=list(report.devices),
+            )
+        )
+    return findings
+
+
 # ── assembly ─────────────────────────────────────────────────────────────────
 
 
 def collect(
-    data, db_file: Path, source: Path, mode: str, import_log: str = ""
+    data,
+    db_file: Path,
+    source: Path,
+    mode: str,
+    import_log: str = "",
+    repairs=(),
 ) -> Overview:
     with duckdb.connect(str(db_file), read_only=True) as conn:
         tables = sorted(r[0] for r in conn.execute("SHOW TABLES").fetchall())
@@ -479,6 +510,7 @@ def collect(
         )
 
         findings: list[Finding] = []
+        findings += findings_from_repairs(repairs)
         findings += parse_import_warnings(import_log)
         if source.exists():
             findings += find_duplicate_files(source)

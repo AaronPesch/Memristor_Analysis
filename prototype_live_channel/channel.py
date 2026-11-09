@@ -25,6 +25,7 @@ from app.core.paths import APP_DATA_PATH, DB_FILE
 from app.core.theme import DARK, LIGHT, PLOT_COLORS
 from app.plotting.config import Config
 
+import coerce
 import dashboard_data
 import live_pipeline
 
@@ -376,6 +377,14 @@ class ImportWorker(QObject):
                     f"folder.{stale}"
                 )
 
+            # A single non-numeric cell makes the converter promote that whole
+            # column to text for every file, and the first .abs() in
+            # transforms.py then dies on it -- which is why a device can import
+            # on its own and its stack cannot. Cast back before plotting.
+            repairs = coerce.repair_cycles(DB_FILE)
+            for report in repairs:
+                print(coerce.describe(report), file=log)
+
             self.progress.emit(50)
             self.status.emit("Phase 2/3: building figures...")
             cfg = Config(db_file=DB_FILE, output_dir=HERE, mode=self.mode)
@@ -385,7 +394,12 @@ class ImportWorker(QObject):
             self.status.emit("Phase 3/3: checking the data...")
             # Hashing every source file belongs on this thread, not the UI one.
             overview = dashboard_data.collect(
-                data, DB_FILE, self.path, self.mode.value, import_log=log.getvalue()
+                data,
+                DB_FILE,
+                self.path,
+                self.mode.value,
+                import_log=log.getvalue(),
+                repairs=repairs,
             )
 
             self.progress.emit(100)

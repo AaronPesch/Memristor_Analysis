@@ -92,7 +92,10 @@ def build_device(root: Path, row: str, col: int, cycles: int, rng) -> None:
         )
     _write(device_dir / "03 endurance set.xlsx", set_sheets)
 
-    # 04 endurance reset -- drives V_reset and I_reset_max
+    # 03 endurance reset -- drives V_reset, I_reset_max and I_LRS.
+    # The number must match the set file: build_endurance_table pairs them by
+    # source_file.replace("endurance_set", "endurance_reset"), so a reset file
+    # numbered differently is never found and I_LRS/R_LRS stay empty.
     reset_sheets = {}
     for k in range(cycles):
         sweep = _sweep(
@@ -111,7 +114,7 @@ def build_device(root: Path, row: str, col: int, cycles: int, rng) -> None:
             ["Time", "AV", "AI", "VRESET", "IRESET", "NORM_COND"],
             block,
         )
-    _write(device_dir / "04 endurance reset.xlsx", reset_sheets)
+    _write(device_dir / "03 endurance reset.xlsx", reset_sheets)
 
     # 01 electroforming -- one shot, VFORM is read with MAX()
     v_form = 2.4 + 0.6 * grad + rng.normal(0, 0.05)

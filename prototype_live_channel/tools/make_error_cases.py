@@ -62,7 +62,7 @@ def case_unreadable_files(root: Path) -> None:
     folder.mkdir(parents=True, exist_ok=True)
     # What a placeholder or a truncated download looks like: the name says
     # .xlsx, the content is not a zip container at all.
-    for name in ("03 endurance set.xlsx", "04 endurance reset.xlsx"):
+    for name in ("03 endurance set.xlsx", "03 endurance reset.xlsx"):
         (folder / name).write_bytes(b"\x00" * 64)
 
 
